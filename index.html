@@ -256,6 +256,10 @@ tbody tr:hover{background:var(--bg1)}
       <div class="gl">분석 · 재고</div>
       <div class="nav" data-v="sim" data-t="방송 시뮬레이션"><span class="lb">시뮬레이션</span></div>
     </div>
+    <div class="navgroup">
+      <div class="gl">의견</div>
+      <div class="nav" data-v="survey" data-t="의견 설문"><span class="lb">📝 의견 설문</span></div>
+    </div>
     <div class="navgroup" id="memberNav" style="display:none">
       <div class="gl">관리자</div>
       <div class="nav" data-v="members" data-t="직원 관리"><span class="lb">직원 관리</span></div>
@@ -473,6 +477,15 @@ tbody tr:hover{background:var(--bg1)}
         <p class="hint">가입 신청을 <b>승인</b>해야 그 계정이 콘솔을 이용할 수 있습니다. 등급(직원/팀장/임원/경영진)은 앞으로 메뉴 접근 제어에 씁니다. 이 메뉴는 <b>관리자만</b> 보입니다.</p>
         <div class="scroll" id="memSummary" style="margin-bottom:12px"></div>
         <div class="card scroll" style="padding:0"><table id="t_members"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+      </div>
+
+      <!-- 의견 설문 (콘솔 사용성) -->
+      <div class="view" id="v-survey">
+        <div class="sechead"><h2 class="sec">의견 설문</h2><span class="tag">콘솔 사용성</span></div>
+        <p class="hint">홈쇼핑팀 콘솔을 더 낫게 만들기 위한 의견 설문입니다. 2~3분이면 됩니다. 응답은 <b>관리자만</b> 보고, 언제든 다시 저장하면 갱신됩니다. 솔직한 의견 부탁드립니다.</p>
+        <div id="surveyAdminBar" style="margin-bottom:10px"></div>
+        <div id="surveyBox"><div class="state">로그인 후 표시</div></div>
+        <div id="surveyResults"></div>
       </div>
 
       <!-- 세트 구성 → SKU 탭 '구성' 서브탭으로 이동 -->
@@ -935,7 +948,7 @@ function navTo(v,push){if(push===undefined)push=true;
   const navEl=document.querySelector('.nav[data-v="'+v+'"]')||document.querySelector('.rb[data-v="'+v+'"]');if(navEl)navEl.classList.add('active');
   const view=$('v-'+v);if(view)view.classList.add('active');
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
-  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();
+  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   if(window.innerWidth<760)document.body.classList.add('collapsed');
   scrollTo({top:0,behavior:'smooth'});
@@ -3137,6 +3150,82 @@ $('copyImgSettle').onclick=async()=>{const node=$('settleCanvas');if(!node){toas
       catch(err){const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='방송기준정산서.png';a.click();toast('이미지 저장됨(클립보드 미지원 브라우저)','ok');}});
   }catch(err){toast('이미지 생성 실패: '+err.message,'err');}};
 
+// ===== 의견 설문 (콘솔 사용성) =====
+const SURVEY_KEY='usability_2607';
+const SV_FREQ=['매일 여러 번','매일 1회 정도','가끔(주 몇 회)','거의 안 씀'];
+const SV_FEAT=['방송 편성/스케줄','실시간 콜·틱 입력','결산(자사/대행)','콜현황 카톡 공유','라인·세트 구성','대행 결산','시뮬레이션','재고·SKU','개발요청'];
+const SV_AREA=[['broadcast','방송 편성·입력'],['tick','실시간 콜·틱 입력'],['settle','결산(자사/대행)'],['config','라인·세트 구성'],['calllink','콜현황 공유(카톡)']];
+const SV_R5=[{v:1,l:'1 매우 불편'},{v:2,l:'2'},{v:3,l:'3 보통'},{v:4,l:'4'},{v:5,l:'5 매우 좋음'}];
+const _svOpts='display:flex;flex-wrap:wrap;gap:8px 14px;margin:2px 0';
+const _svOpt='display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer';
+async function surveyUid(){try{const {data:{user}}=await sb.auth.getUser();return user&&user.id;}catch(_){return null;}}
+function svRadios(name,opts,val,addNA){return `<div style="${_svOpts}">`+opts.map(o=>`<label style="${_svOpt}"><input type="radio" name="${name}" value="${o.v}" ${String(val)===String(o.v)?'checked':''}>${esc(o.l)}</label>`).join('')+(addNA?`<label style="${_svOpt}"><input type="radio" name="${name}" value="0" ${String(val)==='0'?'checked':''}>안 씀</label>`:'')+'</div>';}
+async function loadSurvey(){
+  if(!AUTHED){$('surveyBox').innerHTML='<div class="state">로그인 후 표시</div>';return;}
+  const uid=await surveyUid();let ex=null;
+  if(uid){const {data}=await sb.from('hs_survey_response').select('*').eq('survey_key',SURVEY_KEY).eq('user_id',uid).maybeSingle();ex=data;}
+  renderSurveyForm(ex);
+  const adm=(typeof isAdmin==='function')?isAdmin():!!(ME&&ME.is_admin);
+  $('surveyAdminBar').innerHTML=adm?'<button class="btn sm" id="surveyResBtn">📊 결과 보기 (관리자)</button>':'';
+  $('surveyResults').innerHTML='';
+  if(adm)$('surveyResBtn').onclick=()=>loadSurveyResults();
+}
+function renderSurveyForm(ex){
+  const a=(ex&&ex.answers)||{};const name=(ex&&ex.respondent_name)||(ME&&ME.name)||'';
+  const q=(t,sub)=>`<div style="font-weight:700;margin:16px 0 6px">${t}${sub?`<span class="muted" style="font-weight:400;font-size:11px;margin-left:6px">${sub}</span>`:''}</div>`;
+  let h=`<div class="card" style="padding:18px;max-width:760px">`;
+  h+=`<label class="muted" style="font-size:12px">이름</label><input id="svName" class="hsearch" style="max-width:220px;display:block;margin:3px 0 2px" value="${esc(name)}">`;
+  h+=q('1. 콘솔 전반 만족도')+svRadios('sv_overall',SV_R5,a.overall);
+  h+=q('2. 콘솔을 얼마나 자주 쓰나요?')+svRadios('sv_freq',SV_FREQ.map((l,i)=>({v:i+1,l})),a.freq);
+  h+=q('3. 주로 쓰는 기능 (여러 개)')+`<div style="${_svOpts}">`+SV_FEAT.map(f=>`<label style="${_svOpt}"><input type="checkbox" name="sv_feat" value="${esc(f)}" ${(a.feat||[]).includes(f)?'checked':''}>${esc(f)}</label>`).join('')+'</div>';
+  h+=q('4. 영역별 사용성','1 매우 불편 ~ 5 매우 좋음 · 안 쓰면 "안 씀"');
+  h+='<div style="display:flex;flex-direction:column;gap:8px">'+SV_AREA.map(([k,l])=>`<div style="border-top:1px solid var(--line1);padding-top:6px"><div style="font-size:12.5px;font-weight:600;margin-bottom:3px">${esc(l)}</div>${svRadios('sv_area_'+k,SV_R5,(a.area||{})[k],true)}</div>`).join('')+'</div>';
+  h+=q('5. 가장 불편하거나 헷갈리는 점은?')+`<textarea id="sv_pain" class="hsearch" style="width:100%;box-sizing:border-box;min-height:58px" placeholder="구체적으로 적어주시면 큰 도움이 됩니다">${esc(a.pain||'')}</textarea>`;
+  h+=q('6. 가장 원하는 개선·새 기능은?')+`<textarea id="sv_want" class="hsearch" style="width:100%;box-sizing:border-box;min-height:58px">${esc(a.want||'')}</textarea>`;
+  h+=q('7. 세트 구성(단품/싱글/더블/패밀리) 입력에서 불편한 점은?','편성 시 구성 자동생성·판매가·매칭 등')+`<textarea id="sv_comp" class="hsearch" style="width:100%;box-sizing:border-box;min-height:58px">${esc(a.comp||'')}</textarea>`;
+  h+=q('8. 그 외 하고 싶은 말')+`<textarea id="sv_etc" class="hsearch" style="width:100%;box-sizing:border-box;min-height:50px">${esc(a.etc||'')}</textarea>`;
+  h+=`<div style="margin-top:14px;display:flex;gap:10px;align-items:center"><button class="btn primary" id="svSubmit">${ex?'응답 수정 저장':'제출'}</button><span id="svMsg" class="muted"></span></div></div>`;
+  $('surveyBox').innerHTML=h;
+  $('svSubmit').onclick=submitSurvey;
+}
+async function submitSurvey(){
+  const rv=n=>{const el=document.querySelector('input[name="'+n+'"]:checked');return el?+el.value:null;};
+  const area={};SV_AREA.forEach(([k])=>{const v=rv('sv_area_'+k);if(v!=null)area[k]=v;});
+  const overall=rv('sv_overall');
+  const answers={overall,freq:rv('sv_freq'),feat:[...document.querySelectorAll('input[name="sv_feat"]:checked')].map(e=>e.value),area,pain:$('sv_pain').value.trim(),want:$('sv_want').value.trim(),comp:$('sv_comp').value.trim(),etc:$('sv_etc').value.trim()};
+  const uid=await surveyUid();
+  const row={survey_key:SURVEY_KEY,user_id:uid,respondent_name:$('svName').value.trim()||null,respondent_email:(ME&&ME.email)||null,overall_rating:overall,answers,updated_at:new Date().toISOString()};
+  const btn=$('svSubmit');btn.disabled=true;
+  const {error}=await sb.from('hs_survey_response').upsert(row,{onConflict:'survey_key,user_id'});
+  btn.disabled=false;
+  if(error){$('svMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(error.message)+'</span>';return;}
+  $('svMsg').innerHTML='<span style="color:#0f9d58">저장됨 · 감사합니다!</span>';toast('설문 응답 저장됨 · 감사합니다','ok');btn.textContent='응답 수정 저장';
+}
+async function loadSurveyResults(){
+  const {data,error}=await sb.from('hs_survey_response').select('*').eq('survey_key',SURVEY_KEY).order('updated_at',{ascending:false});
+  if(error){$('surveyResults').innerHTML='<div class="card" style="padding:14px;margin-top:12px;color:var(--blocked)">결과 조회 실패: '+esc(error.message)+'</div>';return;}
+  const rows=data||[];
+  if(!rows.length){$('surveyResults').innerHTML='<div class="card" style="padding:16px;margin-top:12px">아직 응답이 없습니다.</div>';return;}
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const ovs=rows.map(r=>r.overall_rating).filter(v=>v!=null);
+  const areaAvg=SV_AREA.map(([k,l])=>{const vs=rows.map(r=>((r.answers||{}).area||{})[k]).filter(v=>v&&v>0);return [l,avg(vs),vs.length];});
+  const featCnt={};SV_FEAT.forEach(f=>featCnt[f]=0);rows.forEach(r=>((r.answers||{}).feat||[]).forEach(f=>{if(featCnt[f]!=null)featCnt[f]++;}));
+  let h=`<div class="card" style="padding:18px;margin-top:14px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>설문 결과</b><span class="muted">${rows.length}명 응답</span><div class="spacer"></div><button class="btn sm" id="svExport">CSV 내보내기</button></div>`;
+  h+=`<div class="kpis" style="margin:0 0 10px"><div class="kpi brand"><div class="l">전반 만족도 평균</div><div class="v">${avg(ovs)?avg(ovs).toFixed(1):'–'}/5</div><div class="s">${ovs.length}명</div></div></div>`;
+  h+='<div style="font-weight:700;margin:8px 0 4px">영역별 평균</div><div style="display:flex;flex-direction:column;gap:5px">'+areaAvg.map(([l,v,n])=>`<div style="display:flex;align-items:center;gap:8px"><span style="width:150px;font-size:12px">${esc(l)}</span><div style="flex:1;background:var(--bg2);border-radius:6px;height:14px;max-width:240px"><div style="width:${v?(v/5*100):0}%;background:var(--brand);height:100%;border-radius:6px"></div></div><b style="font-size:12px">${v?v.toFixed(1):'–'}</b><span class="muted" style="font-size:10px">${n}명</span></div>`).join('')+'</div>';
+  h+='<div style="font-weight:700;margin:12px 0 4px">주로 쓰는 기능</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+Object.entries(featCnt).sort((a,b)=>b[1]-a[1]).map(([f,c])=>`<span class="chip" style="background:var(--brand-soft);color:var(--brand-ink)">${esc(f)} ${c}</span>`).join('')+'</div>';
+  const ft=(key,title)=>{const arr=rows.map(r=>({n:r.respondent_name||'익명',t:((r.answers||{})[key]||'').trim()})).filter(x=>x.t);if(!arr.length)return '';return `<div style="font-weight:700;margin:12px 0 4px">${title}</div>`+arr.map(x=>`<div style="border-left:3px solid var(--brand);padding:4px 10px;margin-bottom:5px;background:var(--bg1);border-radius:0 6px 6px 0;font-size:12.5px"><b>${esc(x.n)}</b> · ${esc(x.t)}</div>`).join('');};
+  h+=ft('pain','불편·헷갈리는 점')+ft('want','원하는 개선·기능')+ft('comp','세트 구성 관련')+ft('etc','기타')+'</div>';
+  $('surveyResults').innerHTML=h;
+  $('svExport')&&($('svExport').onclick=()=>surveyCsv(rows));
+}
+function surveyCsv(rows){
+  const cols=['이름','이메일','전반만족도','사용빈도','불편점','원하는개선','세트구성의견','기타','응답일'];
+  const enc=arr=>arr.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',');
+  const body=rows.map(r=>{const a=r.answers||{};return enc([r.respondent_name,r.respondent_email,r.overall_rating,(SV_FREQ[(a.freq||0)-1]||''),a.pain,a.want,a.comp,a.etc,(r.updated_at||'').slice(0,16)]);});
+  const csv='﻿'+enc(cols)+'\n'+body.join('\n');
+  const A=document.createElement('a');A.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));A.download='의견설문_결과.csv';A.click();
+}
 // ===== 개발요청 (코어 셸 공통) =====
 let REQ_SHOT=null,REQ_BUSY=false;
 // withShot=true(플로팅 🛠, 화면캡처 첨부) / false(글쓰기, 아이디어 등록)

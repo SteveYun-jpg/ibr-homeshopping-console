@@ -359,12 +359,12 @@ tbody tr:hover{background:var(--bg1)}
             <button class="btn sm" id="delBc" style="color:var(--blocked);border-color:#f3c9c9">삭제</button><button class="btn primary sm" id="saveBc">방송 저장</button><button class="btn sm" id="genReport">보고 멘트</button><button class="btn primary sm" id="genSettle">정산서</button></div>
           <div class="card"><div id="bcSub" style="font-size:17px;font-weight:800;color:var(--ink1);letter-spacing:-.01em;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--brand-soft)"></div><div style="display:flex;gap:10px;flex-wrap:wrap" id="bcKpis"></div></div>
           <div class="card"><h3 style="display:flex;align-items:center;gap:8px">방송 정보 <span id="bcLock" style="display:none;color:var(--blocked);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">🔒 방송 완료 · 편성 조건 잠금 <span style="color:var(--ok);font-weight:600">(실적·구성은 입력 가능)</span></span></h3>
-            <div class="row3"><div><label>홈쇼핑사 <span class="muted" id="fChTag" style="font-weight:400"></span></label><select id="fChannel"></select></div><div><label>브랜드 <span class="muted" id="fBrandHint" style="font-weight:400"></span></label><select id="fBrand"></select></div><div><label>라인 <span class="muted" id="fLineHint" style="font-weight:400"></span></label><select id="fLineTop"><option value="">라인 선택</option></select></div></div>
-            <div class="row3"><div style="grid-column:1 / -1"><label>방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
+            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 홈쇼핑사 <span class="muted" id="fChTag" style="font-weight:400"></span></label><select id="fChannel"></select></div><div><label>브랜드 <span class="muted" id="fBrandHint" style="font-weight:400"></span></label><select id="fBrand"></select></div><div><label>라인 <span class="muted" id="fLineHint" style="font-weight:400"></span></label><select id="fLineTop"><option value="">라인 선택</option></select></div></div>
+            <div class="row3"><div style="grid-column:1 / -1"><label><span style="color:#DC2626" title="저장 필수">●</span> 방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
             <div class="row3"><div><label>정산 구분</label><div class="seg" id="fFeeSeg"><button type="button" data-v="정액" class="on">정액</button><button type="button" data-v="정률">정률</button></div></div><div><div id="fFixedBox"><label>특약비(원)</label><input type="text" inputmode="numeric" id="fFixed"></div><div id="fRateBox" style="display:none"><label id="fRateLbl">홈사 수수료율(%)</label><input type="number" id="fRate"></div></div><div><label>거래 구분</label><div class="seg" id="fDealSeg"><button type="button" data-v="자사" class="on">자사</button><button type="button" data-v="대행">대행</button></div><span class="hint" id="dealHint" style="display:none;font-size:10.5px">대행: 수익 = 매출 × 대행수수료율</span></div></div>
-            <div class="row3"><div><label>방송 시작 <span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
+            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 방송 시작 <span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
             <div class="row3"><div><label>주문매출목표</label><input type="text" inputmode="numeric" id="fTarget"></div><div><label>순매출목표</label><input type="text" inputmode="numeric" id="fNet"></div><div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
-            <div class="row3"><div><label>세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
+            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
             <div class="row3"><div><label>프로그램/차수</label><input id="fProg"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><input id="fPpl" placeholder="프로그램명" style="display:none;flex:1.4"><input id="fPplCost" type="number" placeholder="비용(원)" style="display:none;flex:1;min-width:0"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:13px"><div><label>쇼호스트</label><input id="fHost" placeholder="쇼호스트명"></div><div><label>PD</label><input id="fPd" placeholder="PD명"></div><div><label>담당 MD</label><input id="fMd" list="gsmd" placeholder="MD명"><datalist id="gsmd"><option>박민주 부장</option><option>장효석 이사</option><option>민정현 주임</option><option>한수진 과장</option><option>빅토리아 이사(외부)</option></datalist></div><div><label>색상</label><input type="color" id="fColor" value="#0D9488" style="width:48px;height:38px;padding:2px;border:1px solid var(--line1);border-radius:9px;cursor:pointer"></div></div>
             <label style="font-size:11.5px;color:var(--ink3);display:block;margin:4px 0 4px">사후미팅 메모</label>
@@ -978,7 +978,7 @@ async function loadBrandMeta(force){if(Object.keys(BRAND_META).length&&!force)re
 // 홈쇼핑 운영 확정(브랜드 탭에서 체크)된 브랜드만 노출. 메타 로딩 전이면 안전하게 전체 노출.
 const isHsBrand=b=>!Object.keys(BRAND_META).length?true:BRAND_META[b]===true;
 async function loadLineTab(){if(!AUTHED)return;if(!PICKERS)await loadPickers();await loadBrandMeta();
-  const all=[...new Set(PICKP.map(p=>p.brand).filter(Boolean))].sort();
+  const all=[...new Set([...PICKP.map(p=>p.brand).filter(Boolean),...Object.keys(BRAND_META).filter(b=>BRAND_META[b]===true)])].sort();
   const brands=all.filter(isHsBrand);
   if($('lnBrand')){const cur=$('lnBrand').value;$('lnBrand').innerHTML='<option value="">브랜드 선택</option>'+brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');if(cur&&brands.includes(cur))$('lnBrand').value=cur;}}
 $('lnBrand')&&($('lnBrand').onchange=()=>{LN_BRAND=$('lnBrand').value;if(LN_BRAND)loadLineData();else $('lnStatus').textContent='';});
@@ -2349,7 +2349,7 @@ $('prSave').onclick=async()=>{const rows=PRS.filter(x=>x.price!=null).map(x=>({i
 // ===== 편성·방송 (라이브 입력) =====
 const BCH={'5787e453-af19-4320-a0e3-55bf1f1824eb':'롯데홈쇼핑','71e71762-e2a4-4684-9b2b-9d7580bf8787':'현대홈쇼핑','0e454997-4c23-4036-b85e-7dd7663b0a73':'NS홈쇼핑','4ca032b5-e4d7-43e6-a979-7f25e40bdd13':'CJ온스타일','d0ef8113-a6ce-41ac-9098-e7e867f9c75c':'GS샵','87e6e975-cc66-47fa-802a-aaab7de4b928':'홈앤쇼핑','64f7ada8-fc91-4d7c-8ffd-62af7911a514':'신세계','bbafb236-68bb-4923-8407-6c3aba3dd01a':'KT알파','5f6ef246-29eb-456a-b21f-54c531bf48de':'SK스토아','96667469-62e4-474c-b89c-8ce7059bb478':'롯데원'};
 const DOW=['일','월','화','수','목','금','토'];const baekman=n=>Math.round((+n||0)/1e6).toLocaleString('ko-KR');
-let curYM=new Date(),BC=null,COMPS=[],TICKS=[],bcChart=null,DEAL_FILTER='all',BRAND_DEAL={};
+let curYM=new Date(),BC=null,COMPS=[],TICKS=[],bcChart=null,DEAL_FILTER='all',BRAND_DEAL={},LINE_RULE_NAMES={};
 let CAL_MODE='bc', SCYCLE=null;   // 캘린더 보기(방송/정산) + 정산주기 캐시
 const CH_TYPE={},CH_CORP={};   // 채널ID → 라이브/T커머스, 법인 (hs_channels 기준)
 async function ensureChannels(){if(Object.keys(CH_TYPE).length)return;
@@ -2446,6 +2446,7 @@ async function loadPickers(){
      +(used.length?`<optgroup label="홈쇼핑 방송 브랜드">${used.map(opt).join('')}</optgroup>`:'')
      +(rest.length?`<optgroup label="기타 브랜드">${rest.map(opt).join('')}</optgroup>`:'');}
   await loadPresets();   // 방송 입력이 프리셋(단품/싱글/더블…)으로 동작
+  {const {data:lr}=await sb.from('hs_line_rule').select('brand_name,line_name');LINE_RULE_NAMES={};(lr||[]).forEach(r=>{if(!r.line_name)return;(LINE_RULE_NAMES[r.brand_name]=LINE_RULE_NAMES[r.brand_name]||new Set()).add(r.line_name);});}
   PICKERS=true;}
 
 // ===== 세트 구성(프리셋) 관리 페이지 =====
@@ -2460,7 +2461,7 @@ async function loadPreset(){
     PCOST={};(sc||[]).forEach(x=>{if(x.unit_cost!=null)PCOST[x.set_code]=+x.unit_cost;});
   }
   await loadBrandMeta();
-  const brands=[...new Set(PICKP.map(p=>p.brand).filter(Boolean))].filter(isHsBrand).sort();
+  const brands=[...new Set([...PICKP.map(p=>p.brand).filter(Boolean),...Object.keys(BRAND_META).filter(b=>BRAND_META[b]===true)])].filter(isHsBrand).sort();
   $('pbBrand').innerHTML='<option value="">브랜드 선택</option>'+brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
   $('pbLine').innerHTML='<option value="">라인 선택</option>';
   if($('pcChannel')){const chs=Object.entries(BCH).sort((a,z)=>String(a[1]).localeCompare(String(z[1]),'ko'));
@@ -2540,7 +2541,11 @@ function pickBrandName(){const id=$('fBrand')?$('fBrand').value:'';const b=BRAND
 // 상단 브랜드가 바뀌면 라인 목록을 채운다 (구성 피커는 이 선택을 상속)
 function fillLineTop(keep){const el=$('fLineTop');if(!el)return;const bn=pickBrandName();
   const cur=keep?el.value:'';
-  const lines=[...new Set(PICKP.filter(p=>p.brand===bn&&p.line).map(p=>p.line))].sort();
+  let lines=[...new Set(PICKP.filter(p=>p.brand===bn&&p.line).map(p=>p.line))];
+  if(!lines.length){   // 품목 없는 브랜드(대행 등) — 프리셋·라인규칙에서 라인명을 가져옴
+    lines=[...new Set([...PRESETS.filter(p=>p.brand_name===bn&&p.line).map(p=>p.line),...(LINE_RULE_NAMES[bn]?[...LINE_RULE_NAMES[bn]]:[])].filter(Boolean))];
+  }
+  lines.sort();
   el.innerHTML='<option value="">라인 선택</option>'+lines.map(ln=>`<option value="${esc(ln)}">${esc(stripLine(ln,bn))}</option>`).join('');
   if(keep&&lines.includes(cur))el.value=cur;
   fillSkuPicker();updateCompBL();}
@@ -3030,26 +3035,31 @@ function syncBcChart(){const labels=TICKS.map(t=>hhmm(new Date(t.tick_at))),sale
   if(bcChart)bcChart.destroy();
   bcChart=new Chart($('bcChart'),{data:{labels,datasets:[{type:'line',label:'누적매출',data:sales,yAxisID:'y',borderColor:'#0D9488',backgroundColor:'rgba(13,148,136,.1)',tension:.25,fill:true},{type:'line',label:'콜',data:calls,yAxisID:'y1',borderColor:'#E5484D',tension:.25}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Pretendard'}}}},scales:{y:{position:'left',ticks:{callback:v=>baekman(v)+'백만'}},y1:{position:'right',grid:{drawOnChartArea:false}}}}});}
 // ===== 필수값 검증 (비필수: 프로그램/차수·쇼호스트·PD·MD·사후미팅메모) =====
+// 저장 최소 필수 — 이것만 있으면 저장 가능(나머지는 방송 전 채우면 됨)
+const BC_HARD=[['fChannel','홈쇼핑사'],['fProduct','방송이름'],['fAir','방송 시작'],['fTax','세금']];
+// 완성 권장 목록 — 저장은 막지 않고 안내만
 const BC_REQ=[['fChannel','홈쇼핑사'],['fBrand','브랜드'],['fProduct','방송이름'],['fAir','방송 시작'],['fEnd','방송 종료'],['fTarget','주문매출목표'],['fNet','순매출목표'],['fConv','전환율'],['fTax','세금']];
-function bcMissing(){const m=[];BC_REQ.forEach(([id,l])=>{const el=$(id);if(el&&String(el.value==null?'':el.value).trim()==='')m.push(l);});
+function fldEmpty(id){const el=$(id);return !el||String(el.value==null?'':el.value).trim()==='';}
+function bcMissingHard(){return BC_HARD.filter(([id])=>fldEmpty(id)).map(([,l])=>l);}
+function bcMissing(){const m=[];BC_REQ.forEach(([id,l])=>{if(fldEmpty(id))m.push(l);});
   const lt=$('fLineTop');if(lt&&lt.options.length>1&&!lt.value)m.push('라인');
   const dealAgy=getDealSeg()==='대행',fee=getFeeSeg();
-  if(!dealAgy&&String($('fCost').value).trim()==='')m.push('원가율');
-  if(!dealAgy&&fee==='정액'&&String($('fFixed').value).trim()==='')m.push('특약비');
-  if((dealAgy||fee==='정률')&&String($('fRate').value).trim()==='')m.push('수수료율');
-  if(dealAgy&&String($('fAgency').value).trim()==='')m.push('대행수수료');
-  if($('fPplYn')&&$('fPplYn').value==='유'&&String($('fPpl').value).trim()==='')m.push('PPL 내용');
+  if(!dealAgy&&fldEmpty('fCost'))m.push('원가율');
+  if(!dealAgy&&fee==='정액'&&fldEmpty('fFixed'))m.push('특약비');
+  if((dealAgy||fee==='정률')&&fldEmpty('fRate'))m.push('수수료율');
+  if(dealAgy&&fldEmpty('fAgency'))m.push('대행수수료');
+  if($('fPplYn')&&$('fPplYn').value==='유'&&fldEmpty('fPpl'))m.push('PPL 내용');
   return m;}
-function updateSaveGate(){const miss=bcMissing(),bad=miss.length>0;
-  ['saveSchedule','saveBc'].forEach(id=>{const b=$(id);if(b){b.disabled=bad;b.style.opacity=bad?.5:1;b.style.cursor=bad?'not-allowed':'';b.title=bad?('필수값 미입력: '+miss.join(', ')):'';}});
-  const h=$('bcReqHint');if(h)h.textContent=bad?('필수값: '+miss.join(', ')):'';}
+function updateSaveGate(){const hard=bcMissingHard(),soft=bcMissing(),bad=hard.length>0;
+  ['saveSchedule','saveBc'].forEach(id=>{const b=$(id);if(b){b.disabled=bad;b.style.opacity=bad?.5:1;b.style.cursor=bad?'not-allowed':'';b.title=bad?('저장 필수 미입력: '+hard.join(', ')):(soft.length?('미입력(나중에 가능): '+soft.join(', ')):'');}});
+  const h=$('bcReqHint');if(h)h.innerHTML=bad?('<span style="color:var(--blocked)">저장하려면: '+esc(hard.join(', '))+' 필요</span>'):(soft.length?('<span class="muted">저장 가능 · 방송 전 권장: '+esc(soft.join(', '))+'</span>'):'');}
 // 방송 정보(스케줄)만 저장 — 사후미팅 아래 "방송정보 저장" 버튼
 async function saveSchedule(silent){
   const comp=$('fComp').value.trim().split('\n').filter(Boolean).map(l=>{const p=l.split(' - ');return{channel:(p[0]||'').trim(),product:(p[1]||'').trim(),program:''};});
   const {startIso:airIso,endIso}=bcTimes();const feeType=getFeeSeg();const dealType=getDealSeg();
   if(!airIso){toast('방송 시작시각을 입력하세요','err');return false;}
-  const miss=bcMissing();
-  if(miss.length){toast('필수값을 입력하세요: '+miss.join(', '),'err');updateSaveGate();return false;}
+  const miss=bcMissingHard();
+  if(miss.length){toast('저장 최소 필수: '+miss.join(', '),'err');updateSaveGate();return false;}
   const dur=(airIso&&endIso)?Math.max(0,Math.round((new Date(endIso)-new Date(airIso))/60000)):null;
   const row={channel_id:$('fChannel').value,brand_id:($('fBrand')&&$('fBrand').value)||null,line:($('fLineTop')&&$('fLineTop').value)||null,product_name:$('fProduct').value||'새 방송',air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:feeType==='정액'?(num('fFixed')||null):null,commission_rate:(feeType==='정률'||dealType==='대행')?(+$('fRate').value/100||null):null,agency_fee_rate:(dealType==='대행')?(+$('fAgency').value/100||null):null,target_sales:num('fTarget')||0,net_target:num('fNet')||null,conv_rate:$('fConv').value?(+$('fConv').value/100):null,tax_type:$('fTax').value,program_name:$('fProg').value,ppl_note:($('fPplYn').value==='유'?($('fPpl').value||null):null),ppl_cost:($('fPplYn').value==='유'?(+$('fPplCost').value||null):null),cost_rate:(+$('fCost').value||27)/100,backmargin_rate:(+$('fBack').value||12)/100,competitors:comp,postmeeting:$('fPost').value,show_host:$('fHost').value||null,pd:$('fPd').value||null,md:$('fMd').value||null,color:$('fColor').value||null,updated_by:$('who').textContent};
   const wasNew=!!BC.__new;let err=null;

@@ -724,7 +724,7 @@ tbody tr:hover{background:var(--bg1)}
   <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:480px;width:100%;max-height:92vh;overflow:auto">
     <div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:16px" id="agEditTitle">대행사</b><div class="spacer"></div><button class="btn sm" id="agEditClose">닫기</button></div>
     <label style="font-size:12px;color:var(--ink3)">대행사명</label><input id="agE_name" class="hsearch" style="width:100%;margin:2px 0 10px">
-    <label style="font-size:12px;color:var(--ink3)">브랜드</label><input id="agE_brand" class="hsearch" style="width:100%;margin:2px 0 10px">
+    <label style="font-size:12px;color:var(--ink3)">브랜드 <span style="opacity:.6">(요율 적용 대상 · Ctrl/⌘ 로 복수 선택)</span></label><select id="agE_brandSel" multiple size="5" style="width:100%;margin:2px 0 10px;height:auto;font-family:inherit;font-size:12.5px;padding:6px;border:1px solid var(--line1);border-radius:8px;box-sizing:border-box"></select>
     <label style="font-size:12px;color:var(--ink3)">기본 수수료율 % <span style="opacity:.6">(단일요율일 때만, 홈사별이면 비움)</span></label><input id="agE_rate" class="hsearch" inputmode="decimal" style="width:100%;margin:2px 0 10px" placeholder="예: 3">
     <label style="font-size:12px;color:var(--ink3)">홈사별 요율 <span style="opacity:.6">(한 줄에 "홈사명 요율%", 예: 롯데홈쇼핑 4)</span></label>
     <textarea id="agE_rates" style="width:100%;height:110px;margin:2px 0 10px;font-family:inherit;font-size:12px;padding:8px;border:1px solid var(--line1);border-radius:8px;box-sizing:border-box" placeholder="롯데홈쇼핑 4&#10;CJ홈쇼핑 4&#10;NS홈쇼핑 2"></textarea>
@@ -1677,30 +1677,40 @@ function agRenderMaster(){
   ],AG_LIST||[],'대행사 없음',null,a=>agEditModal(a));
 }
 $('agAdd').onclick=()=>agEditModal(null);
-function agEditModal(a){
+async function agEditModal(a){
   AG_EDIT=a;
   $('agEditTitle').textContent=a?a.name:'대행사 추가';
   $('agE_name').value=a?a.name:'';
-  $('agE_brand').value=a?(a.brand_label||''):'';
   $('agE_rate').value=(a&&a.default_rate!=null)?(+(a.default_rate*100).toFixed(2)):'';
   $('agE_rates').value=(a&&a.rates.length)?a.rates.map(r=>r.channel+' '+(+(r.rate*100).toFixed(2))).join('\n'):'';
   $('agE_del').style.display=a?'':'none';
+  const sel=$('agE_brandSel');sel.innerHTML='<option disabled>불러오는 중…</option>';
   $('agEditMask').style.display='flex';
+  const [{data:brands},{data:maps}]=await Promise.all([
+    sb.from('brands').select('id,name').order('name'),
+    a?sb.from('hs_agency_brand').select('brand_id').eq('agency_id',a.id):Promise.resolve({data:[]})
+  ]);
+  const mapped=new Set((maps||[]).map(m=>m.brand_id));
+  sel.innerHTML=(brands||[]).map(b=>`<option value="${b.id}" ${mapped.has(b.id)?'selected':''}>${esc(b.name)}</option>`).join('');
 }
 $('agEditClose').onclick=()=>$('agEditMask').style.display='none';
 $('agE_save').onclick=async()=>{
   const name=$('agE_name').value.trim();if(!name){toast('대행사명을 입력하세요','warn');return;}
-  const brand=$('agE_brand').value.trim()||null;
+  const sel=$('agE_brandSel');const brandIds=[...sel.selectedOptions].map(o=>o.value);
+  const brand_label=[...sel.selectedOptions].map(o=>o.textContent).join(', ')||null;
   const dr=$('agE_rate').value.trim();const default_rate=dr===''?null:(parseFloat(dr)/100);
   // 홈사별 요율 파싱
   const rlines=$('agE_rates').value.split('\n').map(l=>l.trim()).filter(Boolean);
   const rates=[];for(const l of rlines){const m=l.match(/^(.*?)[\s\t]+(-?\d+(?:\.\d+)?)%?$/);if(m)rates.push({channel:m[1].trim(),rate:parseFloat(m[2])/100});}
   let agId=AG_EDIT?AG_EDIT.id:null;
-  if(AG_EDIT){await sb.from('hs_agency').update({name,brand_label:brand,default_rate}).eq('id',agId);}
-  else{const {data,error}=await sb.from('hs_agency').insert({name,brand_label:brand,default_rate,sort_no:(AG_LIST||[]).length+1}).select('id').single();if(error){toast('저장 실패: '+error.message,'blocked');return;}agId=data.id;}
+  if(AG_EDIT){await sb.from('hs_agency').update({name,brand_label,default_rate}).eq('id',agId);}
+  else{const {data,error}=await sb.from('hs_agency').insert({name,brand_label,default_rate,sort_no:(AG_LIST||[]).length+1}).select('id').single();if(error){toast('저장 실패: '+error.message,'blocked');return;}agId=data.id;}
   await sb.from('hs_agency_rate').delete().eq('agency_id',agId);
   if(rates.length)await sb.from('hs_agency_rate').insert(rates.map(r=>({agency_id:agId,channel:r.channel,rate:r.rate})));
-  $('agEditMask').style.display='none';toast('저장되었습니다','ok');
+  // 브랜드 매핑(요율 해석 소스 hs_agency_brand) 유지 — 이게 있어야 방송별 요율이 잡힘
+  await sb.from('hs_agency_brand').delete().eq('agency_id',agId);
+  if(brandIds.length){const {error:me}=await sb.from('hs_agency_brand').insert(brandIds.map(bid=>({agency_id:agId,brand_id:bid})));if(me){toast('브랜드 매핑 저장 실패: '+me.message,'blocked');return;}}
+  $('agEditMask').style.display='none';toast('저장됨 · 요율이 방송별 손익에 반영됩니다','ok');
   await agLoadData(true);agRenderMaster();
 };
 $('agE_del').onclick=async()=>{
@@ -1851,8 +1861,9 @@ function agRenderRecon(){
 /* 대행사 읽기전용 리포트 (#agencyreport/<id>) */
 $('agE_link')&&($('agE_link').onclick=()=>{
   if(!AG_EDIT){toast('먼저 저장 후 링크를 만드세요','warn');return;}
-  const url=location.origin+location.pathname+'#agencyreport/'+AG_EDIT.id;
-  if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('리포트 링크 복사됨 (로그인 후 열람)','ok'),()=>prompt('링크',url));
+  if(!AG_EDIT.report_token){toast('저장 후 다시 열어주세요 (링크 토큰 생성됨)','warn');return;}
+  const url='https://ibr-homeshopping-console.netlify.app/r/'+AG_EDIT.report_token;
+  if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('무로그인 리포트 링크 복사됨 · 대행사에 전달하세요','ok'),()=>prompt('링크',url));
   else prompt('링크',url);
 });
 let AR_ID=null;

@@ -498,6 +498,7 @@ tbody tr:hover{background:var(--bg1)}
               <button class="btn sm on" data-f="all" style="padding:2px 9px;font-size:11px">전체</button>
               <button class="btn sm" data-f="open" style="padding:2px 9px;font-size:11px">미회신</button>
               <button class="btn sm" data-f="ext" style="padding:2px 9px;font-size:11px">외부</button>
+              <button class="btn sm" data-f="src" style="padding:2px 9px;font-size:11px" title="글로벌소싱 콘솔이 만든 공급사·관세사·포워더 스레드">소싱·물류</button>
             </div>
             <div id="wfList" style="max-height:620px;overflow:auto"><div class="state" style="padding:22px">로그인 후 표시</div></div>
           </div>
@@ -3220,7 +3221,13 @@ const WF_TENANT='68ae6fae-5dbf-43bd-90e2-390a795fa529';
 let WF={parties:[],flows:{},threads:[],cur:null,msgs:[],filter:'all',side:'files',sub:null,uid:null,brands:[]};
 const wfKindLabel=k=>({internal_team:'내부',homeshopping:'홈사',agency:'대행사',brand_supplier:'공급사'}[k]||'거래처');
 const wfMsgBadge=k=>({request:['요청','#F59E0B'],reply:['회신','#3B82F6'],doc:['자료','#0D9488'],note:['메모','#94A3B8']}[k]||['메모','#94A3B8']);
-function wfFlowFor(party){return (party&&party.kind==='internal_team'&&party.team_key==='global_sourcing')?'gs_handoff':'hs_native';}
+function wfFlowFor(party){const k=(party||{}).kind;
+  if(k==='internal_team'&&party.team_key==='global_sourcing')return 'gs_handoff';
+  if(k==='brand_supplier'||k==='customs'||k==='forwarder')return 'gs_handoff';   // 소싱·물류 계열(타 콘솔 생성분)
+  return 'hs_native';}
+// 타 콘솔(글로벌소싱)이 만든 스레드는 workflow_key가 없을 수 있음 → 거래처 유형으로 추론
+function wfFlowKey(t){return t.workflow_key||wfFlowFor(t.party);}
+const WF_HS_KINDS=['internal_team','homeshopping','agency'];   // 홈쇼핑 관점 기본 노출
 function wfSteps(key){const f=WF.flows[key];return (f&&f.stages)||[];}
 async function loadWorkflow(){
   if(!AUTHED){$('wfList').innerHTML='<div class="state" style="padding:22px">로그인 후 표시</div>';return;}
@@ -3253,15 +3260,17 @@ async function wfLoadThreads(){
 function wfRenderList(){
   const q=($('wfSearch')&&$('wfSearch').value||'').toLowerCase();
   let rows=WF.threads;
+  if(WF.filter==='all')rows=rows.filter(t=>WF_HS_KINDS.includes((t.party||{}).kind));   // 홈쇼핑 관점
   if(WF.filter==='open')rows=rows.filter(t=>t.open>0);
   if(WF.filter==='ext')rows=rows.filter(t=>t.party&&t.party.is_external);
+  if(WF.filter==='src')rows=rows.filter(t=>!WF_HS_KINDS.includes((t.party||{}).kind));   // 소싱·물류(타 콘솔)
   if(q)rows=rows.filter(t=>((t.name||'')+' '+((t.party||{}).name||'')+' '+((t.last||{}).body||'')).toLowerCase().includes(q));
   $('wfCount').textContent=rows.length;
   if(!rows.length){$('wfList').innerHTML='<div class="state" style="padding:22px">스레드가 없습니다 — <b>+ 새 스레드</b>로 시작</div>';return;}
   $('wfList').innerHTML=rows.map(t=>{
     const brand=(t.name||'').split(' · ')[0]||t.name||'';
     const ext=t.party&&t.party.is_external;
-    const stepNm=(wfSteps(t.workflow_key).find(s=>s.key===t.current_step)||{}).name||'';
+    const stepNm=(wfSteps(wfFlowKey(t)).find(s=>s.key===t.current_step)||{}).name||'';
     const when=t.last?new Date(t.last.created_at).toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}):'';
     const sel=WF.cur&&WF.cur.id===t.id;
     return `<div class="wfRow" data-id="${t.id}" style="padding:9px 12px;border-bottom:1px solid var(--line1);cursor:pointer;border-left:3px solid ${sel?'var(--brand)':'transparent'};background:${sel?'var(--bg1)':'transparent'}">
@@ -3285,13 +3294,13 @@ async function wfOpen(id){
 }
 function wfRenderDetail(){
   const t=WF.cur;if(!t){$('wfDetail').innerHTML='<div class="state" style="padding:60px 20px">스레드를 선택하세요</div>';return;}
-  const steps=wfSteps(t.workflow_key),curIdx=Math.max(0,steps.findIndex(s=>s.key===t.current_step));
+  const steps=wfSteps(wfFlowKey(t)),curIdx=Math.max(0,steps.findIndex(s=>s.key===t.current_step));
   const ext=t.party&&t.party.is_external;
   let h=`<div style="padding:12px 16px;border-bottom:1px solid var(--line1)">
     <div style="display:flex;align-items:center;gap:8px"><b style="font-size:14.5px">${esc((t.name||'').split(' · ')[0])}</b>
       <span class="muted">↔</span><b style="font-size:13px">${esc((t.party||{}).name||'')}</b>
       <span class="chip" style="background:${ext?'#FEF3C7':'var(--bg2)'};color:${ext?'#92400E':'var(--ink3)'};font-size:10px">${ext?'외부':'내부'} · ${wfKindLabel((t.party||{}).kind)}</span>
-      <div class="spacer"></div><span class="muted" style="font-size:11px">${esc((WF.flows[t.workflow_key]||{}).name||'')}</span></div></div>`;
+      <div class="spacer"></div><span class="muted" style="font-size:11px">${esc((WF.flows[wfFlowKey(t)]||{}).name||'')}</span></div></div>`;
   // 파이프라인
   h+=`<div style="padding:10px 16px;border-bottom:1px solid var(--line1);display:flex;gap:6px;flex-wrap:wrap;align-items:center">`+
     steps.map((s,i)=>{const done=i<curIdx,cur=i===curIdx;
@@ -3301,7 +3310,7 @@ function wfRenderDetail(){
   h+='<div id="wfLedger" style="padding:12px 16px;max-height:330px;overflow:auto">';
   if(!WF.msgs.length)h+='<div class="state" style="padding:30px">아직 주고받은 내용이 없습니다. 아래에서 요청·자료를 올려보세요.</div>';
   else h+=WF.msgs.map(m=>{const [lb,col]=wfMsgBadge(m.kind),mine=m.author_id===WF.uid;
-    const st=(wfSteps(t.workflow_key).find(s=>s.key===m.workflow_step)||{}).name||'';
+    const st=(wfSteps(wfFlowKey(t)).find(s=>s.key===m.workflow_step)||{}).name||'';
     const att=(m.attachments||[]).map(a=>`<span class="chip" style="background:var(--bg2);font-size:10px">📎 ${esc(a.name||'파일')}</span>`).join(' ');
     return `<div style="border:1px solid var(--line1);border-radius:10px;padding:8px 11px;margin-bottom:7px;background:${mine?'rgba(13,148,136,.06)':'#fff'}">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
@@ -3338,9 +3347,11 @@ function wfRenderSide(){
   box.innerHTML=files.map(f=>`<div style="border-bottom:1px solid var(--line1);padding:6px 0;font-size:11.5px">📎 ${esc(f.name||'파일')}<div class="muted" style="font-size:10px">${esc(f.step||'')} · ${new Date(f.at).toLocaleDateString('ko-KR')}</div></div>`).join('');
 }
 async function wfSetStep(k){if(!WF.cur)return;
-  const {error}=await sb.from('co_channel').update({current_step:k,updated_at:new Date().toISOString()}).eq('id',WF.cur.id);
+  const wk=wfFlowKey(WF.cur);   // 타 콘솔 생성분은 workflow_key가 비어 있어 이때 확정 저장
+  const {error}=await sb.from('co_channel').update({current_step:k,workflow_key:wk,updated_at:new Date().toISOString()}).eq('id',WF.cur.id);
   if(error){toast('단계 변경 실패: '+error.message,'err');return;}
-  WF.cur.current_step=k;const t=WF.threads.find(x=>x.id===WF.cur.id);if(t)t.current_step=k;
+  WF.cur.current_step=k;WF.cur.workflow_key=wk;
+  const t=WF.threads.find(x=>x.id===WF.cur.id);if(t){t.current_step=k;t.workflow_key=wk;}
   wfRenderDetail();wfRenderList();}
 async function wfMarkDone(id){
   const {error}=await sb.from('co_message').update({status:'done'}).eq('id',id);

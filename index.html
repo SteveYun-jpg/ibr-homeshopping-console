@@ -3221,10 +3221,17 @@ const WF_TENANT='68ae6fae-5dbf-43bd-90e2-390a795fa529';
 let WF={parties:[],flows:{},threads:[],cur:null,msgs:[],filter:'all',side:'files',sub:null,uid:null,brands:[]};
 const wfKindLabel=k=>({internal_team:'내부',homeshopping:'홈사',agency:'대행사',brand_supplier:'공급사'}[k]||'거래처');
 const wfMsgBadge=k=>({request:['요청','#F59E0B'],reply:['회신','#3B82F6'],doc:['자료','#0D9488'],note:['메모','#94A3B8']}[k]||['메모','#94A3B8']);
+// 표준 규약(글로벌소싱 콘솔과 합의): 내부팀↔내부팀=gs_handoff(공유 스파인) · 홈사·대행사=hs_native(홈쇼핑 고유) · 소싱측 외부=gs_import(소싱 고유)
+const WF_MY_TEAM='homeshopping';
 function wfFlowFor(party){const k=(party||{}).kind;
-  if(k==='internal_team'&&party.team_key==='global_sourcing')return 'gs_handoff';
-  if(k==='brand_supplier'||k==='customs'||k==='forwarder')return 'gs_handoff';   // 소싱·물류 계열(타 콘솔 생성분)
-  return 'hs_native';}
+  if(k==='internal_team')return 'gs_handoff';
+  if(k==='homeshopping'||k==='agency')return 'hs_native';
+  return 'gs_import';}
+// 스레드 표준 키 — 양쪽 콘솔이 같은 값을 계산해 같은 스레드를 공유
+function wfPairKey(brandId,party){const k=(party||{}).kind,tk=(party||{}).team_key;
+  if(k==='internal_team'){const other=tk||'global_sourcing',a=[WF_MY_TEAM,other].sort();
+    return 'brand:'+brandId+'|team:'+a[0]+'+'+a[1];}
+  return 'brand:'+brandId+'|party:'+party.id;}
 // 타 콘솔(글로벌소싱)이 만든 스레드는 workflow_key가 없을 수 있음 → 거래처 유형으로 추론
 function wfFlowKey(t){return t.workflow_key||wfFlowFor(t.party);}
 const WF_HS_KINDS=['internal_team','homeshopping','agency'];   // 홈쇼핑 관점 기본 노출
@@ -3400,13 +3407,17 @@ $('wfN_save')&&($('wfN_save').onclick=async()=>{
   const bid=$('wfN_brand').value,pid=$('wfN_party').value,wk=$('wfN_wf').value;
   if(!bid||!pid){toast('브랜드·거래처를 선택하세요','warn');return;}
   const brand=(WF.brands.find(b=>b.id===bid)||{}).name||'', party=(WF.parties.find(p=>p.id===pid)||{}).name||'';
-  // find-or-create (brand × party) — 글로벌소싱 콘솔과 동일 규칙이라 같은 스레드를 공유
-  const {data:ex}=await sb.from('co_channel').select('*').eq('obj_module','brand').eq('obj_id',bid).eq('party_id',pid).maybeSingle();
-  let ch=ex;
+  // find-or-create — 표준 pair_key 기준(양쪽 콘솔 동일 계산) → 같은 관계면 한 스레드
+  const pobj=WF.parties.find(p=>p.id===pid)||{id:pid};
+  const pkey=wfPairKey(bid,pobj);
+  let ch=null;
+  {const {data:byKey}=await sb.from('co_channel').select('*').eq('pair_key',pkey).maybeSingle();ch=byKey||null;}
+  if(!ch){const {data:ex}=await sb.from('co_channel').select('*').eq('obj_module','brand').eq('obj_id',bid).eq('party_id',pid).maybeSingle();ch=ex||null;
+    if(ch&&!ch.pair_key)await sb.from('co_channel').update({pair_key:pkey}).eq('id',ch.id);}
   if(!ch){
     const steps=wfSteps(wk);
     const {data,error}=await sb.from('co_channel').insert({tenant_id:WF_TENANT,kind:'object',name:`${brand} · ${party}`,
-      obj_module:'brand',obj_type:'brand',obj_id:bid,party_id:pid,workflow_key:wk,current_step:(steps[0]||{}).key||null,created_by:WF.uid}).select().single();
+      obj_module:'brand',obj_type:'brand',obj_id:bid,party_id:pid,pair_key:pkey,workflow_key:wk,current_step:(steps[0]||{}).key||null,created_by:WF.uid}).select().single();
     if(error){toast('스레드 생성 실패: '+error.message,'err');return;}
     ch=data;
     try{await sb.from('co_channel_member').upsert({channel_id:ch.id,user_id:WF.uid,role:'owner'},{onConflict:'channel_id,user_id'});}catch(_){}

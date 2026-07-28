@@ -52,7 +52,7 @@
       '<div style="flex:1"></div>'+
       '<input class="q" id="suwfQ" placeholder="🔎 요청·자료 전체 검색">'+
       '<button class="newbig" id="suwfNew">+ 새 스레드</button></div>'+
-      '<div class="ws" id="suwfGrid" style="height:'+(opts.height||'calc(100vh - 132px)')+';min-height:540px">'+
+      '<div class="ws" id="suwfGrid"'+(opts.height?' style="height:'+opts.height+'"':'')+'>'+
         '<div class="pane list">'+
           '<div class="lhead"><b>스레드 · <span id="suwfCount">0</span></b><button class="newthread" id="suwfNew2">+ 새로</button></div>'+
           '<div class="filters" id="suwfFilters">'+

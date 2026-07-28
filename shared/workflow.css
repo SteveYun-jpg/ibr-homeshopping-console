@@ -4,6 +4,8 @@
       고칠 때는 반드시 여기서만 고치세요. 각 콘솔에 복사 금지.
    호스팅: https://ibr-homeshopping-console.netlify.app/shared/workflow.css
    ========================================================= */
+/* 호스트가 flex 컬럼이면 화면을 꽉 채운다(글로벌소싱 콘솔과 동일). 높이 지정 없이도 자동. */
+.suwf{display:flex;flex-direction:column;min-height:0;flex:1}
 .suwf{--teal:#0D9488;--teal-d:#0F766E;--teal-t:#D6F5EC;--emerald:#10B981;--emerald-t:#D1FAE5;
   --amber:#F59E0B;--amber-t:#FEF3C7;--blue:#0369A1;--blue-t:#E0F2FE;--red:#E11D48;
   --navy:#0F2A3F;--ink2:#1E293B;--sub:#64748B;--ink4:#94A3B8;--line:#E4EBE2;--line2:#EEF2F0;--bg1:#F5F9F4;
@@ -18,7 +20,7 @@
 .suwf .wstop .newbig{background:var(--teal);color:#fff;border:0;border-radius:9px;padding:9px 15px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
 
 /* 3분할 */
-.suwf .ws{display:grid;grid-template-columns:288px 1fr 296px;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:11px}
+.suwf .ws{display:grid;grid-template-columns:288px 1fr 296px;flex:1 1 0%;min-height:0;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:11px}
 .suwf .pane{overflow-y:auto;height:100%;min-width:0}
 .suwf .pane.list{border-right:1px solid var(--line);background:#fff;display:flex;flex-direction:column}
 .suwf .pane.center{display:flex;flex-direction:column;overflow:hidden;background:var(--bg1)}

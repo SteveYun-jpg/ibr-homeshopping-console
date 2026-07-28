@@ -414,11 +414,38 @@ tbody tr:hover{background:var(--bg1)}
         <div class="sechead"><h2 class="sec">자사 결산</h2><span class="tag">목적별 3뷰</span></div>
         <p class="hint"><b>방송결과기준</b>(방송 1건별 잠정) · <b>영업기준</b>(방송월 귀속 — 방송한 달로 실적 집계) · <b>회계마감기준</b>(세금계산서 발행월) — 영업·회계마감은 <b>월단위</b>입니다. 방송결과기준은 <b>행을 클릭</b>하면 방송별 정산서가 열립니다.</p>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-          <div class="toolbar seg" id="settleSeg" style="max-width:820px;margin:0"><button class="on" data-v="flash">방송결과기준</button><button data-v="monthly">영업기준(방송월)</button><button data-v="vat">회계마감기준(계산서월)</button><button data-v="vatrep">부가세신고 양식</button><button data-v="audit">🔍 월별 검수</button></div>
+          <div class="toolbar seg" id="settleSeg" style="max-width:820px;margin:0"><button class="on" data-v="flash">방송결과기준</button><button data-v="monthly">영업기준(방송월)</button><button data-v="vat">회계마감기준(계산서월)</button><button data-v="vatrep">부가세신고 양식</button><button data-v="audit">🔍 월별 검수</button><button data-v="upload">⬆ 정산서 업로드</button></div>
           <label style="margin:0;color:var(--ink3);font-size:12px">기간</label><input type="month" id="settlePeriod" class="hsearch" style="max-width:150px">
         </div>
         <div class="scroll" id="settleSummary" style="margin-bottom:14px"></div>
-        <div class="card scroll" style="padding:0"><table id="t_settle"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+        <!-- 자사 정산서 업로드 -->
+        <div id="settleUpload" class="hidden">
+          <div class="card" style="padding:16px;margin-bottom:12px">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <input type="file" id="suFile" accept=".xlsx,.xls,.csv" style="font-size:13px">
+              <span class="muted" style="font-size:11.5px">홈사 정산서(과면세 확인 등) 엑셀을 올리면 표를 읽어 정산 원장에 넣습니다.</span>
+            </div>
+            <div id="suSetup" class="hidden" style="margin-top:12px;border-top:1px solid var(--line1);padding-top:12px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div><label class="muted" style="font-size:11px">시트</label><select id="suSheet" style="min-width:140px"></select></div>
+                <div><label class="muted" style="font-size:11px">헤더 행</label><input id="suHeaderRow" type="number" min="1" value="1" style="width:70px"></div>
+                <div><label class="muted" style="font-size:11px">홈쇼핑사</label><select id="suChannel" style="min-width:150px"></select></div>
+                <div><label class="muted" style="font-size:11px">정산월</label><input type="month" id="suYm" class="hsearch" style="max-width:140px"></div>
+                <div><label class="muted" style="font-size:11px">정산방식</label><select id="suType" style="min-width:100px"><option>총액법</option><option>순액법</option></select></div>
+              </div>
+              <div style="font-weight:700;font-size:12px;margin:12px 0 6px">컬럼 연결 <span class="muted" style="font-weight:400">— 자동 추정된 항목을 확인하고 필요하면 바꿔주세요 (★ 필수)</span></div>
+              <div id="suMap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px"></div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+                <button class="btn sm" id="suPreview">미리보기</button>
+                <button class="btn primary sm" id="suSave" disabled>정산 원장에 저장</button>
+                <label style="display:flex;gap:5px;align-items:center;font-size:11.5px" class="muted"><input type="checkbox" id="suReplace" checked> 같은 홈사·정산월 기존 데이터 교체</label>
+                <span class="muted" id="suMsg" style="font-size:11.5px"></span>
+              </div>
+            </div>
+          </div>
+          <div id="suPrev"></div>
+        </div>
+        <div class="card scroll" id="settleTblBox" style="padding:0"><table id="t_settle"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
       </div>
 
       <!-- 대행 결산 -->
@@ -1450,6 +1477,10 @@ $('settlePeriod').addEventListener('change',loadSettle);
 async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   if(!AUTHED){tbl('t_settle',[{h:'',l:1,f:()=>''}],null,'로그인 후 조회');return;}
   const ym=$('settlePeriod')?$('settlePeriod').value:'';
+  {const up=$('settleUpload'),tb=$('settleTblBox'),isUp=settleMode==='upload';
+   if(up)up.classList.toggle('hidden',!isUp);
+   if(tb)tb.style.display=isUp?'none':'';
+   if(isUp){sum.innerHTML='<p class="hint" style="margin:0">홈사에서 받은 <b>정산서 엑셀</b>을 올리면 표를 읽어 <b>정산 원장</b>에 넣습니다. 홈사마다 양식이 달라 <b>컬럼 연결</b>을 한 번 확인한 뒤 저장하세요. 저장하면 결산 3뷰·부가세 양식·월별 검수에 바로 반영됩니다.</p>';return;}}
   if(settleMode==='audit'){await loadAudit();return;}
   if(settleMode==='flash'){
     let {data}=await sb.from('hs_v_settle_flash').select('schedule_id,air_date,air_at,channel_name,brand_name,product_name,판매매출,전환매출,정률수수료,특약비,ppl,잠정손익,달성율,입금예정일,deal_type').eq('deal_type','자사').order('air_at',{ascending:false}).limit(300);
@@ -1463,6 +1494,180 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
 
+// ===== 자사 정산서 업로드 · 자동파싱 =====
+const SU_FIELDS=[
+  ['product_name','품목명',true,[/품목/,/상품명/,/제품/,/판매품목/,/구성/]],
+  ['gross_amount','매출총액',true,[/매출총액/,/총매출/,/판매금액/,/매출액/,/결제금액/]],
+  ['qty','수량',false,[/수량/,/판매수량/,/건수/]],
+  ['supply_amount','공급가액',false,[/공급가/,/공급대가/]],
+  ['vat_amount','부가세신고금액',false,[/부가세신고/,/신고금액/,/^부가세$/,/세액/]],
+  ['sellout_amount','SellOut(고객판매액)',false,[/sellout/i,/셀아웃/,/고객판매/]],
+  ['commission_amt','수수료',false,[/수수료금액/,/수수료$/]],
+  ['return_amount','반품',false,[/반품/,/취소/]],
+  ['cost_amount','원가',false,[/원가/,/매입/]],
+  ['tax_type','과세구분',false,[/과세구분/,/과면세/,/^과세$/,/면세여부/]],
+  ['broadcast_date','방송일',false,[/방송일/,/판매일/,/일자/,/날짜/]],
+  ['product_code','상품코드',false,[/상품코드/,/품목코드/,/코드/]],
+  ['media','매체',false,[/매체/,/채널구분/,/방송구분/]]
+];
+let SU={wb:null,file:'',grid:[],hdr:[],map:{},rows:[],brands:[]};
+function suNum(v){if(v==null||v==='')return null;if(typeof v==='number')return v;
+  const s=String(v).replace(/[,\s원₩]/g,'').replace(/\((.*)\)/,'-$1');const n=parseFloat(s);return isNaN(n)?null:n;}
+function suNorm(s){return String(s==null?'':s).replace(/[\s\n\r]/g,'');}
+function suDetectYm(name){const m=String(name).match(/(20\d{2})[^\d]{0,3}(\d{1,2})\s*월/)||String(name).match(/(20\d{2})[-_.]?(\d{2})/);
+  return m?`${m[1]}-${String(+m[2]).padStart(2,'0')}`:'';}
+function suDetectCh(name){const n=suNorm(name);
+  for(const [id,nm] of Object.entries(BCH)){const key=suNorm(nm).replace(/홈쇼핑|쇼핑|샵|SHOP/gi,'');
+    if(key&&n.includes(key))return id;}
+  if(/CJ/i.test(n))return Object.keys(BCH).find(k=>BCH[k]==='CJ온스타일');
+  if(/GS/i.test(n))return Object.keys(BCH).find(k=>BCH[k]==='GS SHOP');
+  if(/NS/i.test(n))return Object.keys(BCH).find(k=>BCH[k]==='NS홈쇼핑');
+  return '';}
+function suGuessHeaderRow(grid){
+  for(let r=0;r<Math.min(grid.length,20);r++){
+    const row=(grid[r]||[]).map(suNorm);
+    const hit=row.filter(c=>c&&SU_FIELDS.some(([,,,pats])=>pats.some(p=>p.test(c)))).length;
+    if(hit>=2)return r+1;
+  }
+  return 1;}
+function suBuildMap(){
+  const hdr=SU.hdr;
+  SU.map={};
+  SU_FIELDS.forEach(([key,,,pats])=>{
+    let idx=-1;
+    for(let i=0;i<hdr.length;i++){const h=suNorm(hdr[i]);if(!h)continue;
+      if(pats.some(p=>p.test(h))){idx=i;break;}}
+    SU.map[key]=idx;
+  });
+  $('suMap').innerHTML=SU_FIELDS.map(([key,label,req])=>{
+    const opts=['<option value="-1">— 없음 —</option>'].concat(hdr.map((h,i)=>`<option value="${i}" ${SU.map[key]===i?'selected':''}>${esc(suNorm(h)||('열'+(i+1)))}</option>`));
+    return `<div><label class="muted" style="font-size:11px">${req?'<span style="color:#DC2626">★</span> ':''}${label}</label>
+      <select class="suMapSel" data-k="${key}" style="width:100%">${opts.join('')}</select></div>`;}).join('');
+  $('suMap').querySelectorAll('.suMapSel').forEach(s=>s.onchange=()=>{SU.map[s.dataset.k]=+s.value;$('suSave').disabled=true;});
+}
+function suLoadSheet(){
+  const sn=$('suSheet').value;const ws=SU.wb.Sheets[sn];
+  SU.grid=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const guess=suGuessHeaderRow(SU.grid);
+  $('suHeaderRow').value=guess;
+  SU.hdr=SU.grid[guess-1]||[];
+  suBuildMap();
+}
+$('suFile')&&($('suFile').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  $('suMsg').textContent='읽는 중…';
+  try{
+    const buf=await f.arrayBuffer();SU.wb=XLSX.read(buf,{type:'array'});SU.file=f.name;
+    $('suSheet').innerHTML=SU.wb.SheetNames.map(n=>`<option>${esc(n)}</option>`).join('');
+    // 데이터가 가장 많은 시트 우선
+    let best=SU.wb.SheetNames[0],bestN=0;
+    SU.wb.SheetNames.forEach(n=>{const g=XLSX.utils.sheet_to_json(SU.wb.Sheets[n],{header:1,defval:null});if(g.length>bestN){bestN=g.length;best=n;}});
+    $('suSheet').value=best;
+    await ensureChannels();
+    $('suChannel').innerHTML='<option value="">— 홈쇼핑사 선택 —</option>'+Object.entries(BCH).sort((a,z)=>String(a[1]).localeCompare(String(z[1]),'ko')).map(([id,nm])=>`<option value="${id}">${esc(nm)}</option>`).join('');
+    const ch=suDetectCh(f.name);if(ch)$('suChannel').value=ch;
+    const ym=suDetectYm(f.name);if(ym)$('suYm').value=ym;
+    if(ch){const c=(CHS||[]).find(x=>x.id===ch);if(c&&c.revenue_method)$('suType').value=c.revenue_method;}
+    suLoadSheet();
+    $('suSetup').classList.remove('hidden');$('suMsg').textContent='';
+    $('suSave').disabled=true;$('suPrev').innerHTML='';
+  }catch(err){$('suMsg').innerHTML='<span style="color:var(--blocked)">읽기 실패: '+esc(String(err))+'</span>';}
+});
+$('suSheet')&&($('suSheet').onchange=()=>{suLoadSheet();$('suSave').disabled=true;$('suPrev').innerHTML='';});
+$('suHeaderRow')&&($('suHeaderRow').onchange=()=>{SU.hdr=SU.grid[(+$('suHeaderRow').value||1)-1]||[];suBuildMap();$('suSave').disabled=true;$('suPrev').innerHTML='';});
+function suExtract(){
+  const hr=(+$('suHeaderRow').value||1);
+  const m=SU.map,out=[],skipped={sum:0,empty:0};
+  const SUMWORDS=['합계','소계','총계','계','total','합'];
+  for(let r=hr;r<SU.grid.length;r++){
+    const row=SU.grid[r]||[];
+    const name=m.product_name>=0?String(row[m.product_name]==null?'':row[m.product_name]).trim():'';
+    const gross=m.gross_amount>=0?suNum(row[m.gross_amount]):null;
+    const label=[row[0],row[1],name].filter(Boolean).map(x=>String(x).trim()).join(' ');
+    if(SUMWORDS.some(w=>label===w||label.endsWith(w)&&label.length<=6)){skipped.sum++;continue;}
+    if(!name||gross==null){skipped.empty++;continue;}
+    const rec={product_name:name,gross_amount:Math.round(gross)};
+    const put=(k,fn)=>{if(m[k]>=0&&row[m[k]]!=null&&row[m[k]]!=='')rec[k]=fn(row[m[k]]);};
+    put('qty',v=>suNum(v));put('supply_amount',v=>Math.round(suNum(v)||0));put('vat_amount',v=>Math.round(suNum(v)||0));
+    put('sellout_amount',v=>Math.round(suNum(v)||0));put('commission_amt',v=>Math.round(suNum(v)||0));
+    put('return_amount',v=>Math.round(suNum(v)||0));put('cost_amount',v=>Math.round(suNum(v)||0));
+    put('product_code',v=>String(v).trim());put('media',v=>String(v).trim());
+    if(m.tax_type>=0){const t=String(row[m.tax_type]||'');rec.tax_type=/면/.test(t)?'면세':(/과/.test(t)?'과세':null);}
+    if(m.broadcast_date>=0){const v=row[m.broadcast_date];
+      if(v instanceof Date)rec.broadcast_date=v.toISOString().slice(0,10);
+      else if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);if(d)rec.broadcast_date=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
+      else if(typeof v==='string'){const mm=v.match(/(20\d{2})[-./](\d{1,2})[-./](\d{1,2})/);if(mm)rec.broadcast_date=`${mm[1]}-${String(+mm[2]).padStart(2,'0')}-${String(+mm[3]).padStart(2,'0')}`;}}
+    if(rec.vat_amount==null&&rec.gross_amount!=null)rec.vat_amount=rec.gross_amount;   // 신고금액 없으면 매출총액으로
+    out.push(rec);
+  }
+  return {rows:out,skipped};
+}
+async function suMatchBrands(rows){
+  if(!SU.brands.length){const {data}=await sb.from('brands').select('id,name');SU.brands=data||[];}
+  const {data:al}=await sb.from('acct_brand_alias').select('token,brand_id');
+  const alias=al||[];
+  rows.forEach(r=>{
+    const n=suNorm(r.product_name);
+    const a=alias.find(x=>x.token&&n.includes(suNorm(x.token)));
+    if(a){r.brand_id=a.brand_id;return;}
+    const b=SU.brands.find(x=>x.name&&n.includes(suNorm(x.name)));
+    if(b)r.brand_id=b.id;
+  });
+  return rows;
+}
+$('suPreview')&&($('suPreview').onclick=async()=>{
+  if(SU.map.product_name<0||SU.map.gross_amount<0){$('suMsg').innerHTML='<span style="color:var(--blocked)">★ 품목명·매출총액 컬럼을 연결해주세요</span>';return;}
+  const {rows,skipped}=suExtract();
+  await suMatchBrands(rows);
+  SU.rows=rows;
+  const sum=rows.reduce((a,r)=>a+(+r.gross_amount||0),0);
+  const noBrand=rows.filter(r=>!r.brand_id).length;
+  $('suMsg').textContent='';
+  $('suPrev').innerHTML=`<div class="card" style="padding:14px">
+    <div class="kpis" style="margin:0 0 10px">
+      <div class="kpi brand"><div class="l">읽은 행</div><div class="v">${won(rows.length)}행</div><div class="s">합계행 ${skipped.sum} · 빈행 ${skipped.empty} 제외</div></div>
+      <div class="kpi"><div class="l">매출총액 합</div><div class="v">${eok(sum)}</div></div>
+      <div class="kpi ${noBrand?'warn':''}"><div class="l">브랜드 미매칭</div><div class="v">${noBrand}행</div><div class="s">저장 후 검수에서 확인</div></div>
+    </div>
+    <div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
+      <thead><tr style="color:var(--ink3)"><th class="l" style="padding:4px 8px">품목</th><th>수량</th><th>매출총액</th><th>공급가</th><th>신고금액</th><th>SellOut</th><th>과세</th><th class="l">방송일</th><th class="l">브랜드</th></tr></thead>
+      <tbody>${rows.slice(0,12).map(r=>`<tr>
+        <td class="l" style="padding:3px 8px;border-top:1px solid var(--line1)">${esc((r.product_name||'').slice(0,28))}</td>
+        <td style="text-align:right">${r.qty!=null?won(r.qty):'–'}</td>
+        <td style="text-align:right">${won(r.gross_amount)}</td>
+        <td style="text-align:right">${r.supply_amount!=null?won(r.supply_amount):'–'}</td>
+        <td style="text-align:right">${r.vat_amount!=null?won(r.vat_amount):'–'}</td>
+        <td style="text-align:right">${r.sellout_amount!=null?won(r.sellout_amount):'–'}</td>
+        <td>${esc(r.tax_type||'–')}</td><td class="l">${esc(r.broadcast_date||'–')}</td>
+        <td class="l">${r.brand_id?esc((SU.brands.find(b=>b.id===r.brand_id)||{}).name||''):'<span style="color:var(--gold)">미매칭</span>'}</td>
+      </tr>`).join('')}</tbody></table></div>
+    ${rows.length>12?`<div class="muted" style="font-size:11px;margin-top:6px">…외 ${rows.length-12}행</div>`:''}
+  </div>`;
+  $('suSave').disabled=!(rows.length&&$('suChannel').value&&$('suYm').value);
+  if(!$('suChannel').value||!$('suYm').value)$('suMsg').innerHTML='<span style="color:var(--gold)">홈쇼핑사·정산월을 선택하세요</span>';
+});
+$('suSave')&&($('suSave').onclick=async()=>{
+  const ch=$('suChannel').value,ym=$('suYm').value,st=$('suType').value;
+  if(!ch||!ym||!SU.rows.length)return;
+  const btn=$('suSave');btn.disabled=true;btn.textContent='저장 중…';
+  try{
+    if($('suReplace').checked){
+      const {error:de}=await sb.from('hs_settle_raw').delete().eq('channel_id',ch).eq('settle_month',ym);
+      if(de)throw de;
+    }
+    const who=(ME&&ME.name)||$('who').textContent;
+    const payload=SU.rows.map((r,i)=>({...r,channel_id:ch,settle_month:ym,settle_type:st,
+      channel_name:BCH[ch]||null,source_file:SU.file,seq_no:i+1,updated_by:who,updated_at:new Date().toISOString()}));
+    for(let i=0;i<payload.length;i+=200){
+      const {error}=await sb.from('hs_settle_raw').insert(payload.slice(i,i+200));
+      if(error)throw error;
+    }
+    toast(`${ym} ${BCH[ch]||''} 정산 ${payload.length}행 저장`,'ok');
+    $('suMsg').innerHTML='<span style="color:#0f9d58">저장 완료 — 결산·검수에 반영됐습니다</span>';
+    $('suPrev').innerHTML='';$('suFile').value='';$('suSetup').classList.add('hidden');SU.rows=[];
+  }catch(e){$('suMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(e.message||String(e))+'</span>';}
+  btn.disabled=false;btn.textContent='정산 원장에 저장';
+});
 // ===== PPL 프로그램 마스터 =====
 let PPLM=[],PPL_DIRTY={},PPL_USE={};
 async function loadPplMaster(){

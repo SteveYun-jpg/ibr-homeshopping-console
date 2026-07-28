@@ -377,7 +377,11 @@ tbody tr:hover{background:var(--bg1)}
           </div>
           <div class="card">
             <div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-size:13px">구성별 판매</b><span class="muted" style="margin-left:8px">수량만 입력 → 매출 자동</span><span id="bcDraftHint" style="display:none;color:var(--gold);font-weight:600;font-size:11.5px;margin-left:8px">← 먼저 방송 정보를 저장하면 열립니다</span><span id="compAgencyHint" style="display:none;color:var(--ink3);font-size:11.5px;margin-left:8px">대행은 원가가 없어 <b>판매수량·매출</b> 관리용으로만 씁니다 (수수료는 매출 기준 자동)</span><div class="spacer"></div><button class="btn primary sm" id="saveComp" style="margin-left:6px">구성 저장</button></div>
-            <div id="compPicker" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;background:var(--bg1);border:1px solid var(--line1);border-radius:9px;padding:8px 10px"><span class="muted" style="font-size:11.5px;font-weight:600">구성 추가</span><span id="compBL" style="font-size:11.5px;font-weight:700;color:var(--ink1)"></span><span class="muted">›</span><select id="fSku" style="min-width:300px;flex:1"><option value="">구성 선택 (단품/싱글/더블…)</option></select></div>
+            <div id="compPicker" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;background:var(--bg1);border:1px solid var(--line1);border-radius:9px;padding:8px 10px"><span class="muted" style="font-size:11.5px;font-weight:600">구성 추가</span><span id="compBL" style="font-size:11.5px;font-weight:700;color:var(--ink1)"></span><span class="muted">›</span><select id="fSku" style="min-width:260px;flex:1"><option value="">구성 선택 (단품/싱글/더블…)</option></select>
+              <span class="muted" style="font-size:11px">또는 직접 입력</span>
+              <input id="fCompName" class="hsearch" placeholder="구성명 (예: 단품 2팩)" style="width:150px">
+              <input id="fCompPrice" class="hsearch" inputmode="numeric" placeholder="판매가" style="width:100px">
+              <button class="btn sm" id="fCompAdd" title="입력한 이름·판매가로 구성 추가">＋ 추가</button></div>
             <div class="scroll"><table id="compTbl"><thead><tr><th class="l">구성</th><th>가격</th><th>미리주문 수량</th><th>미리주문 매출합계</th><th>미리주문 비율</th><th>방송중 수량</th><th>방송중 매출합계</th><th>방송중 비율</th><th>매출계</th><th></th></tr></thead><tbody id="compBody"></tbody></table></div>
             <div class="muted" id="compNote" style="margin-top:8px"></div>
           </div>
@@ -2643,6 +2647,24 @@ $('fSku').onchange=()=>{const id=$('fSku').value;if(!id||!BC)return;const p=PRES
   COMPS.push({schedule_id:BC.id,seq:COMPS.length+1,set_code:p.set_code,name:nm,price:price||0,preorder_qty:0,onair_qty:0});
   renderComp();renderTick();$('fSku').value='';
   toast(`구성 추가: ${nm}`, 'ok');};
+// 구성 직접 입력 추가 — 프리셋(라인·세트 구성) 등록 없이 현장에서 바로 넣을 때
+function compAddManual(){
+  if(!BC||BC.__new){toast('먼저 방송 정보를 저장하세요','warn');return;}
+  const nmIn=$('fCompName'),prIn=$('fCompPrice');
+  let nm=(nmIn.value||'').trim();
+  const price=Math.round(+String(prIn.value||'').replace(/[,\s원]/g,'')||0);
+  if(!nm){toast('구성명을 입력하세요','warn');nmIn.focus();return;}
+  if(price<=0){toast('판매가를 입력하세요','warn');prIn.focus();return;}
+  const bn=pickBrandName();
+  if(bn&&!nm.startsWith(bn))nm=bn+' '+nm;   // 틱·보고 표기 통일 (예: "우불 단품 2팩")
+  if(COMPS.some(c=>c.name===nm)){toast('이미 같은 이름의 구성이 있습니다','warn');return;}
+  COMPS.push({schedule_id:BC.id,seq:COMPS.length+1,set_code:null,name:nm,price:price,preorder_qty:0,onair_qty:0});
+  nmIn.value='';prIn.value='';
+  renderComp();renderTick();updCompNote();renderKpis();
+  toast(`구성 추가: ${nm} · ${won(price)}원 — 「구성 저장」을 눌러주세요`,'ok');
+}
+$('fCompAdd')&&($('fCompAdd').onclick=compAddManual);
+['fCompName','fCompPrice'].forEach(id=>{const el=$(id);if(el)el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();compAddManual();}});});
 document.querySelectorAll('#fFeeSeg button').forEach(b=>b.onclick=()=>setFeeSeg(b.dataset.v));
 const HOL={'01-01':'신정','02-16':'설날연휴','02-17':'설날','02-18':'설날연휴','03-01':'삼일절','03-02':'대체공휴일','05-05':'어린이날','05-24':'부처님오신날','05-25':'대체공휴일','06-06':'현충일','07-17':'제헌절','08-15':'광복절','09-24':'추석연휴','09-25':'추석','09-26':'추석연휴','10-03':'개천절','10-05':'대체공휴일','10-09':'한글날','12-25':'성탄절'};
 const PAL=['#0D9488','#2563EB','#DB2777','#D97706','#7C3AED','#059669','#DC2626','#0891B2','#CA8A04','#4F46E5'];
@@ -2941,7 +2963,7 @@ function renderComp(){const T=compTotals(),SpreA=T.preAmt,SonA=T.onAmt,dis='';  
   $('compBody').innerHTML=COMPS.map((c,i)=>{const price=+c.price||0,preQ=+c.preorder_qty||0,onQ=+c.onair_qty||0,preA=price*preQ,onA=price*onQ,tot=preA+onA;
     return `<tr><td class="l"><span title="${esc(c.name||'')}">${esc((c.name||'').slice(0,38))}</span>`
       +(c.set_code?`<span class="chip" style="background:var(--bg2);color:var(--ink3);margin-left:4px;font-size:9.5px">${esc(c.set_code)}</span>`
-                  :`<span class="chip" style="background:var(--gold-bg);color:var(--gold);margin-left:4px;font-size:9.5px" title="세트코드가 없어 결산에서 원가가 붙지 않습니다. 삭제 후 '세트 추가'로 다시 넣어주세요">코드없음</span>`)
+                  :`<span class="chip" style="background:var(--gold-bg);color:var(--gold);margin-left:4px;font-size:9.5px" title="세트코드 없음 — 결산에서 원가가 자동으로 붙지 않습니다. 대행·수기 입력 구성은 정상입니다(자사는 라인·세트 구성에서 코드를 매칭하면 원가가 붙습니다)">코드없음</span>`)
       +`</td>`
       +`<td><input ${dis} class="cell2" type="number" value="${price}" data-i="${i}" data-f="price"></td>`
       +`<td><input ${dis} class="cell2" type="number" value="${preQ}" data-i="${i}" data-f="preorder_qty"></td>`

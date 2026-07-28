@@ -560,41 +560,9 @@ tbody tr:hover{background:var(--bg1)}
         <div class="scroll" id="memSummary" style="margin-bottom:12px"></div>
         <div class="card scroll" style="padding:0"><table id="t_members"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
       </div>
+      <!-- 워크플로우 · 거래처 업무 협업 — 공유 모듈(shared/workflow.js)이 렌더합니다 (홈쇼핑·글로벌소싱 공용) -->
+      <div class="view" id="v-workflow"></div>
 
-      <!-- 워크플로우 · 거래처 업무 협업 (3분할) -->
-      <div class="view" id="v-workflow">
-        <div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px">
-          <h2 class="sec" style="margin:0">워크플로우</h2>
-          <span class="muted" style="font-size:12.5px">· 거래처 업무 협업</span>
-          <div class="spacer"></div>
-          <input id="wfSearch" class="hsearch" placeholder="🔎 요청·자료 전체 검색" style="max-width:280px;margin-right:8px">
-          <button class="btn primary sm" id="wfNewBtn">+ 새 스레드</button>
-        </div>
-        <div class="ws" id="wfGrid" style="height:calc(100vh - 132px);min-height:540px">
-          <!-- ① 스레드 리스트 -->
-          <div class="pane list">
-            <div class="lhead"><b>스레드 · <span id="wfCount">0</span></b><button class="newthread" id="wfNewBtn2">+ 새로</button></div>
-            <div class="filters" id="wfFilters">
-              <span class="f on" data-f="all">전체</span>
-              <span class="f" data-f="open">미회신</span>
-              <span class="f" data-f="ext">외부 거래처</span>
-              <span class="f" data-f="mine">내 담당</span>
-              <span class="f" data-f="src" title="글로벌소싱 콘솔이 만든 공급사·관세사·포워더 스레드">소싱·물류</span>
-            </div>
-            <div id="wfList" style="flex:1;overflow-y:auto"><div class="state" style="padding:22px">로그인 후 표시</div></div>
-            <div class="note">스레드 = 브랜드 × 거래처. 글로벌소싱팀도 홈쇼핑사·대행사처럼 하나의 거래처입니다. 방송이 끝나도 계속 이어집니다.</div>
-          </div>
-          <!-- ② 스레드 상세 -->
-          <div class="pane center" id="wfDetail">
-            <div class="state" style="padding:60px 20px">왼쪽에서 스레드를 선택하거나 <b>+ 새 스레드</b>로 시작하세요.</div>
-          </div>
-          <!-- ③ 자료함 / 어시스트 -->
-          <div class="pane right">
-            <div class="rtabs" id="wfSideTabs"><div class="rtab on" data-v="files">자료함</div><div class="rtab" data-v="ai">🤖 어시스트</div></div>
-            <div class="rbody" id="wfSide"><div class="muted" style="font-size:11.5px">스레드를 선택하면 첨부 자료가 모입니다.</div></div>
-          </div>
-        </div>
-      </div>
 
       <!-- PPL 프로그램 마스터 -->
       <div class="view" id="v-ppl">
@@ -3769,9 +3737,26 @@ function wfPairKey(brandId,party){const k=(party||{}).kind,tk=(party||{}).team_k
 function wfFlowKey(t){return t.workflow_key||wfFlowFor(t.party);}
 const WF_HS_KINDS=['internal_team','homeshopping','agency'];   // 홈쇼핑 관점 기본 노출
 function wfSteps(key){const f=WF.flows[key];return (f&&f.stages)||[];}
+// ===== 워크플로우 — 공유 모듈(shared/workflow.js) 마운트 =====
+// 화면·스타일은 홈쇼핑/글로벌소싱이 같은 파일을 씁니다. 여기서는 컨텍스트만 넘깁니다.
+let WF_MOUNTED=null;
 async function loadWorkflow(){
-  if(!AUTHED){$('wfList').innerHTML='<div class="state" style="padding:22px">로그인 후 표시</div>';return;}
+  if(!AUTHED)return;
   if(typeof wfAllowed==='function'&&!wfAllowed()){navTo('home');return;}   // 준비 중 — 대표 계정 전용
+  if(WF_MOUNTED){WF_MOUNTED.reload();return;}
+  if(!window.SuniverseWF){
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='/shared/workflow.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});
+  }
+  if(!window.SuniverseWF){$('v-workflow').innerHTML='<div class="state" style="padding:40px">워크플로우 모듈을 불러오지 못했습니다.</div>';return;}
+  WF_MOUNTED=window.SuniverseWF.mount({
+    el:$('v-workflow'), sb, tenantId:WF_TENANT, myTeam:'homeshopping', myLabel:'홈쇼핑(우리)',
+    partyKinds:['internal_team','homeshopping','agency'],
+    brandLoader:async()=>{const {data}=await sb.from('hs_v_brands').select('id,name').eq('in_use',true).order('name');return data||[];},
+    onCount:n=>{const b=$('wfNavBadge');if(b){b.style.display=n?'':'none';b.textContent=n;}}
+  });
+}
+async function _loadWorkflowLegacy(){
+  if(!AUTHED){$('wfList').innerHTML='<div class="state" style="padding:22px">로그인 후 표시</div>';return;}
   try{const {data:{user}}=await sb.auth.getUser();WF.uid=user&&user.id;}catch(_){}
   if(!WF.parties.length){
     const [{data:ps},{data:fs}]=await Promise.all([

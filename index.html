@@ -376,7 +376,7 @@ tbody tr:hover{background:var(--bg1)}
             <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px"><span id="bcReqHint" class="muted" style="font-size:11px;color:var(--blocked)"></span><button class="btn primary sm" id="saveSchedule">방송정보 저장</button></div>
           </div>
           <div class="card">
-            <div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-size:13px">구성별 판매</b><span class="muted" style="margin-left:8px">수량만 입력 → 매출 자동</span><span id="bcDraftHint" style="display:none;color:var(--gold);font-weight:600;font-size:11.5px;margin-left:8px">← 먼저 방송 정보를 저장하면 열립니다</span><span id="compAgencyHint" style="display:none;color:var(--ink3);font-size:11.5px;margin-left:8px">대행은 매입이 없어 구성 입력이 필요 없습니다 — 매출만 넣으면 수수료가 계산됩니다</span><div class="spacer"></div><button class="btn primary sm" id="saveComp" style="margin-left:6px">구성 저장</button></div>
+            <div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-size:13px">구성별 판매</b><span class="muted" style="margin-left:8px">수량만 입력 → 매출 자동</span><span id="bcDraftHint" style="display:none;color:var(--gold);font-weight:600;font-size:11.5px;margin-left:8px">← 먼저 방송 정보를 저장하면 열립니다</span><span id="compAgencyHint" style="display:none;color:var(--ink3);font-size:11.5px;margin-left:8px">대행은 원가가 없어 <b>판매수량·매출</b> 관리용으로만 씁니다 (수수료는 매출 기준 자동)</span><div class="spacer"></div><button class="btn primary sm" id="saveComp" style="margin-left:6px">구성 저장</button></div>
             <div id="compPicker" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;background:var(--bg1);border:1px solid var(--line1);border-radius:9px;padding:8px 10px"><span class="muted" style="font-size:11.5px;font-weight:600">구성 추가</span><span id="compBL" style="font-size:11.5px;font-weight:700;color:var(--ink1)"></span><span class="muted">›</span><select id="fSku" style="min-width:300px;flex:1"><option value="">구성 선택 (단품/싱글/더블…)</option></select></div>
             <div class="scroll"><table id="compTbl"><thead><tr><th class="l">구성</th><th>가격</th><th>미리주문 수량</th><th>미리주문 매출합계</th><th>미리주문 비율</th><th>방송중 수량</th><th>방송중 매출합계</th><th>방송중 비율</th><th>매출계</th><th></th></tr></thead><tbody id="compBody"></tbody></table></div>
             <div class="muted" id="compNote" style="margin-top:8px"></div>
@@ -2545,7 +2545,7 @@ async function loadPresetGrid(){
 }
 function presetSetOptions(sel){
   const {brand,line}=PSTATE;const sets=PICKP.filter(p=>p.brand===brand&&p.line===line);
-  return '<option value="">— 세트/단품 선택 —</option>'+sets.map(s=>{
+  return '<option value="">— 없음 (판매가만 등록 · 대행 등) —</option>'+sets.map(s=>{
     const c=PCOST[s.code]!=null?` · 원가 ${won(PCOST[s.code])}`:' · 원가없음';
     return `<option value="${esc(s.code)}" ${s.code===sel?'selected':''}>[${s.kind}] ${esc((s.name||'').slice(0,42))}${c}</option>`;}).join('');
 }
@@ -2581,7 +2581,8 @@ $('presetSave')&&($('presetSave').onclick=async()=>{
   let del=sb.from('hs_set_preset').delete().eq('brand_name',brand).eq('line',line);
   del = channel ? del.eq('channel_id',channel) : del.is('channel_id',null);
   await del;   // 이 (브랜드·라인·홈사스코프)만 초기화 후 재삽입 → 삭제/사용안함 그대로 반영
-  const ins=rows.filter(r=>r.set_code).map((r,idx)=>({brand_name:brand,line,channel_id:channel||null,preset_name:r.preset_name.trim(),set_code:r.set_code,price:r.price,tier_order:r.tier_order||((idx+1)*10),active:r.active!==false,updated_by:$('who').textContent}));
+  // 세트코드는 선택 — 대행처럼 SCM 품목이 없는 브랜드는 이름+판매가만으로 구성 등록 가능
+  const ins=rows.filter(r=>r.set_code||r.price!=null).map((r,idx)=>({brand_name:brand,line,channel_id:channel||null,preset_name:r.preset_name.trim(),set_code:r.set_code||null,price:r.price,tier_order:r.tier_order||((idx+1)*10),active:r.active!==false,updated_by:$('who').textContent}));
   let err=null;if(ins.length){const {error}=await sb.from('hs_set_preset').insert(ins);err=error;}
   btn.disabled=false;btn.textContent='구성 저장';
   if(err){toast('저장 실패: '+err.message,'err');return;}
@@ -2634,8 +2635,10 @@ function applyAutoName(){const nm=bcAutoName();if(!nm)return;const el=$('fProduc
   const cur=el.value.trim();if(cur===''||cur===LAST_AUTONAME)el.value=nm;LAST_AUTONAME=nm;}
 $('fLineTop')&&($('fLineTop').onchange=()=>{fillSkuPicker();updateCompBL();applyAutoName();});
 $('fSku').onchange=()=>{const id=$('fSku').value;if(!id||!BC)return;const p=PRESETS.find(x=>x.id===id);if(!p)return;
-  if(COMPS.some(c=>c.set_code===p.set_code)){toast('이미 추가된 구성입니다','warn');$('fSku').value='';return;}
-  const nm=`${pickBrandName()} ${p.preset_name}`;   // 틱·보고에 "아티키 싱글"로 표기
+  const nm0=`${pickBrandName()} ${p.preset_name}`;
+  // 세트코드 없는 구성(대행 등)은 이름으로 중복 판정
+  if(COMPS.some(c=>p.set_code?c.set_code===p.set_code:c.name===nm0)){toast('이미 추가된 구성입니다','warn');$('fSku').value='';return;}
+  const nm=nm0;   // 틱·보고에 "아티키 싱글"로 표기
   const price=p.price!=null?+p.price:(((PICKP.find(x=>x.code===p.set_code)||{}).price)||0);
   COMPS.push({schedule_id:BC.id,seq:COMPS.length+1,set_code:p.set_code,name:nm,price:price||0,preorder_qty:0,onair_qty:0});
   renderComp();renderTick();$('fSku').value='';
@@ -2915,10 +2918,10 @@ function applyLock(){const lock=BC_LOCKED;
 function applyDraftGate(){const isNew=!!(BC&&BC.__new);
   // 단계: ① 방송정보 저장 → 구성 열림  ② 구성 저장 → 실시간 콜 열림
   // 방송 종료 여부는 게이트에 넣지 않는다 — 실적은 방송이 끝난 뒤에 입력하는 게 정상.
-  // 대행은 매입이 없어 원가 계산이 불필요 → 구성 입력 자체를 접는다.
+  // 대행은 원가(매입)가 없을 뿐, 구성은 판매수량·매출·실시간 콜의 단위라 입력을 연다.
   const agy = (getDealSeg()==='대행');
-  const sc=$('saveComp');if(sc)sc.style.display=(isNew||agy)?'none':'';
-  const cp=$('compPicker');if(cp)cp.style.display=(isNew||agy)?'none':'flex';
+  const sc=$('saveComp');if(sc)sc.style.display=isNew?'none':'';
+  const cp=$('compPicker');if(cp)cp.style.display=isNew?'none':'flex';
   {const h=$('compAgencyHint');if(h)h.style.display=agy?'inline':'none';}
   const te=tickEditable();
   $('genTick').disabled=!te;$('tickStep').disabled=!te;$('clrTick').disabled=!te;

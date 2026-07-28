@@ -413,7 +413,7 @@ tbody tr:hover{background:var(--bg1)}
         <div class="sechead"><h2 class="sec">자사 결산</h2><span class="tag">목적별 3뷰</span></div>
         <p class="hint"><b>방송결과기준</b>(방송 1건별 잠정) · <b>영업기준</b>(방송월 귀속 — 방송한 달로 실적 집계) · <b>회계마감기준</b>(세금계산서 발행월) — 영업·회계마감은 <b>월단위</b>입니다. 방송결과기준은 <b>행을 클릭</b>하면 방송별 정산서가 열립니다.</p>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-          <div class="toolbar seg" id="settleSeg" style="max-width:660px;margin:0"><button class="on" data-v="flash">방송결과기준</button><button data-v="monthly">영업기준(방송월)</button><button data-v="vat">회계마감기준(계산서월)</button><button data-v="vatrep">부가세신고 양식</button></div>
+          <div class="toolbar seg" id="settleSeg" style="max-width:820px;margin:0"><button class="on" data-v="flash">방송결과기준</button><button data-v="monthly">영업기준(방송월)</button><button data-v="vat">회계마감기준(계산서월)</button><button data-v="vatrep">부가세신고 양식</button><button data-v="audit">🔍 월별 검수</button></div>
           <label style="margin:0;color:var(--ink3);font-size:12px">기간</label><input type="month" id="settlePeriod" class="hsearch" style="max-width:150px">
         </div>
         <div class="scroll" id="settleSummary" style="margin-bottom:14px"></div>
@@ -761,6 +761,13 @@ tbody tr:hover{background:var(--bg1)}
       <div class="spacer"></div>
       <button class="btn primary" id="noticeClose">확인</button>
     </div>
+  </div>
+</div>
+<div class="mask" id="auditMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:56;padding:20px">
+  <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:20px;max-width:900px;width:100%;max-height:92vh;overflow:auto">
+    <div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-size:16px" id="auditTitle">정산 검수</b><div class="spacer"></div><button class="btn sm" id="auditClose">닫기</button></div>
+    <div id="auditBody"></div>
+    <div id="auditFoot" style="display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--line1)"></div>
   </div>
 </div>
 <div class="mask" id="wfNewMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:55;padding:20px">
@@ -1430,6 +1437,7 @@ $('settlePeriod').addEventListener('change',loadSettle);
 async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   if(!AUTHED){tbl('t_settle',[{h:'',l:1,f:()=>''}],null,'로그인 후 조회');return;}
   const ym=$('settlePeriod')?$('settlePeriod').value:'';
+  if(settleMode==='audit'){await loadAudit();return;}
   if(settleMode==='flash'){
     let {data}=await sb.from('hs_v_settle_flash').select('schedule_id,air_date,air_at,channel_name,brand_name,product_name,판매매출,전환매출,정률수수료,특약비,ppl,잠정손익,달성율,입금예정일,deal_type').eq('deal_type','자사').order('air_at',{ascending:false}).limit(300);
     data=data||[];if(ym)data=data.filter(r=>(r.air_at||'').slice(0,7)===ym);
@@ -1442,6 +1450,120 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
 
+// ===== 월별 정산 검수 (체크리스트 · 사인오프 · 재검수 감지) =====
+const AUDIT_ITEMS=[
+  ['format','형식 이상 (합계행·수량0·과세구분 누락)','anomaly_rows'],
+  ['no_result','방송 실적 미입력','bc_no_result'],
+  ['only_bc','방송만 있고 정산 미도착','only_bc'],
+  ['only_settle','정산만 있고 편성 없음','only_settle'],
+  ['gap','잠정↔확정 차이 20% 이상','big_gap'],
+  ['brand','정산 브랜드 미분류','brand_null']
+];
+let AUD={rows:[],cur:null};
+$('auditClose')&&($('auditClose').onclick=()=>$('auditMask').style.display='none');
+const audStatusChip=(s,changed)=>{
+  if(changed)return '<span class="chip" style="background:#FEE2E2;color:#B91C1C">재검수 필요</span>';
+  const m={done:['완료','#D1FAE5','#065F46'],doing:['검수중','#FEF3C7','#92400E'],recheck:['재검수','#FEE2E2','#B91C1C']};
+  const v=m[s]||['미검수','var(--bg2)','var(--ink3)'];
+  return `<span class="chip" style="background:${v[1]};color:${v[2]}">${v[0]}</span>`;};
+async function loadAudit(){
+  const {data,error}=await sb.from('hs_v_audit_month').select('*').order('ym',{ascending:false});
+  if(error){$('settleSummary').innerHTML='<div class="state" style="padding:18px;color:var(--blocked)">조회 실패: '+esc(error.message)+'</div>';return;}
+  AUD.rows=data||[];
+  const need=AUD.rows.filter(r=>r.status!=='done'||r.changed_after_sign).length;
+  const done=AUD.rows.filter(r=>r.status==='done'&&!r.changed_after_sign).length;
+  const issues=AUD.rows.reduce((a,r)=>a+(+r.anomaly_rows||0)+(+r.only_bc||0)+(+r.only_settle||0)+(+r.big_gap||0)+(+r.bc_no_result||0),0);
+  $('settleSummary').innerHTML='<div class="kpis" style="margin:0">'
+    +`<div class="kpi brand"><div class="l">검수 완료</div><div class="v">${done} / ${AUD.rows.length}개월</div><div class="s">완료 후 데이터가 바뀌면 자동으로 재검수 표시</div></div>`
+    +`<div class="kpi"><div class="l">검수 필요</div><div class="v">${need}개월</div></div>`
+    +`<div class="kpi"><div class="l">확인 대상 건수</div><div class="v">${won(issues)}건</div><div class="s">실적미입력·미도착·차이·형식이상 합계</div></div>`
+    +'</div><p class="hint" style="margin:8px 0 0">월 행을 클릭하면 항목별 체크리스트가 열립니다. 각 항목은 <b>확인✓</b> 또는 <b>사유 메모</b>를 남기고, 모두 처리하면 <b>검수 완료</b>로 확정합니다.</p>';
+  tbl('t_settle',[
+    {h:'월',l:1,f:r=>`<b>${esc(r.ym)}</b>`},
+    {h:'상태',l:1,f:r=>audStatusChip(r.status,r.changed_after_sign)},
+    {h:'정산행',f:r=>won(r.settle_rows)},
+    {h:'정산액(백만)',f:r=>baekman(r.vat_amt)},
+    {h:'방송',f:r=>won(r.bc_n)},
+    {h:'실적미입력',f:r=>+r.bc_no_result?`<b style="color:var(--gold)">${r.bc_no_result}</b>`:'0'},
+    {h:'형식이상',f:r=>+r.anomaly_rows?`<b style="color:var(--blocked)">${r.anomaly_rows}</b>`:'0'},
+    {h:'정산미도착',f:r=>+r.only_bc?`<b style="color:var(--gold)">${r.only_bc}</b>`:'0'},
+    {h:'편성없음',f:r=>+r.only_settle?`<b style="color:var(--gold)">${r.only_settle}</b>`:'0'},
+    {h:'차이20%↑',f:r=>+r.big_gap?`<b style="color:var(--blocked)">${r.big_gap}</b>`:'0'},
+    {h:'검수자',l:1,f:r=>r.signed_by?esc(r.signed_by)+'<div class="muted" style="font-size:10px">'+(r.signed_at||'').slice(0,10)+'</div>':'<span class="muted">–</span>'}
+  ],AUD.rows,'데이터 없음',null,r=>auditOpen(r.ym),{filter:true});
+}
+function auditOpen(ym){
+  const r=AUD.rows.find(x=>x.ym===ym);if(!r)return;AUD.cur=r;
+  const checks=r.checks||{};
+  const box=$('auditMask');
+  const rowsH=AUDIT_ITEMS.map(([key,label,metric])=>{
+    const cnt=+r[metric]||0, c=checks[key]||{};
+    return `<tr>
+      <td class="l" style="padding:8px 10px">${esc(label)}</td>
+      <td style="text-align:center;font-weight:700;color:${cnt?'var(--blocked)':'var(--ink3)'}">${cnt}</td>
+      <td style="text-align:center"><input type="checkbox" class="audChk" data-k="${key}" ${c.ok?'checked':''}></td>
+      <td class="l"><input class="audNote hsearch" data-k="${key}" value="${esc(c.note||'')}" placeholder="${cnt?'사유·조치 내용 (예: 정산서 미도착 — 8월 반영 예정)':'해당 없음'}" style="width:100%;box-sizing:border-box;font-size:11.5px"></td>
+      <td class="l" style="white-space:nowrap"><button class="btn sm audView" data-k="${key}" style="padding:2px 8px;font-size:10.5px">보기</button></td>
+    </tr>`;}).join('');
+  $('auditTitle').textContent=`${ym} 정산 검수`;
+  $('auditBody').innerHTML=`
+    ${r.changed_after_sign?'<div style="background:#FEE2E2;color:#B91C1C;border-radius:8px;padding:8px 11px;font-size:11.5px;font-weight:700;margin-bottom:10px">완료 처리 후 이 달 정산 데이터가 변경되었습니다 — 다시 확인하고 재확정해 주세요.</div>':''}
+    <div class="muted" style="font-size:11.5px;margin-bottom:8px">정산 ${won(r.settle_rows)}행 · ${baekman(r.vat_amt)}백만원 · 방송 ${won(r.bc_n)}건</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--ink3);font-size:10.5px"><th class="l" style="padding:4px 10px">확인 항목</th><th>건수</th><th>확인</th><th class="l">사유·조치</th><th></th></tr></thead>
+      <tbody>${rowsH}</tbody></table>
+    <div style="margin-top:10px"><label class="muted" style="font-size:11px">전체 메모</label>
+      <textarea id="audMemo" class="hsearch" style="width:100%;box-sizing:border-box;min-height:48px">${esc(r.memo||'')}</textarea></div>
+    <div id="audDetail" style="margin-top:10px"></div>`;
+  $('auditFoot').innerHTML=`<button class="btn sm" id="audSave">임시 저장</button>
+    <button class="btn primary sm" id="audSign">검수 완료 확정</button>
+    ${r.status==='done'?'<button class="btn sm" id="audUnsign" style="color:var(--blocked)">확정 해제</button>':''}
+    <span class="muted" id="audMsg" style="font-size:11px"></span>`;
+  box.style.display='flex';
+  $('audSave').onclick=()=>auditSave(false);
+  $('audSign').onclick=()=>auditSave(true);
+  const un=$('audUnsign');if(un)un.onclick=async()=>{await sb.from('hs_audit_month').update({status:'doing',signed_by:null,signed_at:null,snapshot:null}).eq('ym',ym);toast('확정 해제','ok');box.style.display='none';loadAudit();};
+  $('auditBody').querySelectorAll('.audView').forEach(b=>b.onclick=()=>auditDetail(ym,b.dataset.k));
+}
+function auditCollect(){const checks={};
+  $('auditBody').querySelectorAll('.audChk').forEach(c=>{const k=c.dataset.k;checks[k]={ok:c.checked};});
+  $('auditBody').querySelectorAll('.audNote').forEach(n=>{const k=n.dataset.k;checks[k]=Object.assign(checks[k]||{},{note:n.value.trim()});});
+  return checks;}
+async function auditSave(sign){
+  const r=AUD.cur;if(!r)return;
+  const checks=auditCollect(),who=(ME&&ME.name)||$('who').textContent;
+  const unresolved=AUDIT_ITEMS.filter(([k,,metric])=>(+r[metric]||0)>0&&!(checks[k]&&(checks[k].ok||checks[k].note)));
+  if(sign&&unresolved.length){$('audMsg').innerHTML='<span style="color:var(--blocked)">미처리 항목: '+esc(unresolved.map(u=>u[1]).join(', '))+' — 확인 체크 또는 사유를 남겨주세요</span>';return;}
+  const row={ym:r.ym,checks,memo:$('audMemo').value.trim(),status:sign?'done':'doing',updated_at:new Date().toISOString(),updated_by:who};
+  if(sign){row.signed_by=who;row.signed_at=new Date().toISOString();row.snapshot={fp:r.fingerprint,rows:r.settle_rows,vat:r.vat_amt};}
+  const {error}=await sb.from('hs_audit_month').upsert(row,{onConflict:'ym'});
+  if(error){$('audMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(error.message)+'</span>';return;}
+  toast(sign?`${r.ym} 검수 완료 확정`:'임시 저장됨','ok');
+  if(sign)$('auditMask').style.display='none';
+  loadAudit();
+}
+// 항목별 실제 데이터 펼치기
+async function auditDetail(ym,key){
+  const box=$('audDetail');box.innerHTML='<div class="muted" style="font-size:11.5px">불러오는 중…</div>';
+  const wrap=(t,h)=>`<div style="border:1px solid var(--line1);border-radius:9px;padding:10px;margin-top:6px"><b style="font-size:12px">${t}</b>${h}</div>`;
+  const tab=(cols,rows)=>rows.length?`<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px"><thead><tr style="color:var(--ink3)">${cols.map(c=>`<th class="l" style="padding:3px 6px">${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td class="l" style="padding:3px 6px;border-top:1px solid var(--line1)">${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<div class="muted" style="font-size:11px;margin-top:4px">해당 건 없음</div>';
+  try{
+    if(key==='format'){const {data}=await sb.from('hs_v_settle_anomaly').select('*').eq('ym',ym);
+      box.innerHTML=wrap('형식 이상',tab([['유형',r=>esc(r['유형'])],['홈사',r=>esc(r.ch)],['상세',r=>esc(r['상세']||'')],['행수',r=>r['행수']],['금액',r=>won(r['금액'])]],data||[]));}
+    else if(key==='no_result'){const {data}=await sb.from('hs_schedules').select('id,product_name,air_at,channel_id,hs_results(schedule_id)').gte('air_at',ym+'-01').lte('air_at',ym+'-31T23:59:59');
+      const rows=(data||[]).filter(s=>!s.hs_results||!s.hs_results.length);
+      box.innerHTML=wrap('실적 미입력 방송',tab([['방송일',r=>(r.air_at||'').slice(0,10)],['홈사',r=>esc(BCH[r.channel_id]||'')],['제품',r=>esc(r.product_name||'')]],rows));}
+    else if(key==='only_bc'||key==='only_settle'||key==='gap'){
+      const {data}=await sb.from('hs_v_reconcile_monthly').select('*').eq('ym',ym);
+      let rows=data||[];
+      if(key==='only_bc')rows=rows.filter(r=>r['상태']==='방송만 있음(정산 미도착)');
+      else if(key==='only_settle')rows=rows.filter(r=>r['상태']==='정산만 있음(편성 없음)');
+      else rows=rows.filter(r=>r['상태']==='양쪽 있음'&&Math.abs(+r['차이%']||0)>=20);
+      box.innerHTML=wrap('편성 ↔ 정산 대사',tab([['홈사',r=>esc(r['홈사']||'')],['브랜드',r=>esc(r['브랜드']||'')],['방송수',r=>r['방송수']||'–'],['잠정매출',r=>eok(r['잠정매출'])],['확정매출',r=>eok(r['확정매출_영업'])],['차이%',r=>r['차이%']!=null?r['차이%']+'%':'–'],['상태',r=>esc(r['상태']||'')]],rows));}
+    else if(key==='brand'){const {data}=await sb.from('hs_settle_raw').select('product_name,channel_id,vat_amount').eq('settle_month',ym).is('brand_id',null);
+      box.innerHTML=wrap('브랜드 미분류 정산행',tab([['홈사',r=>esc(BCH[r.channel_id]||'')],['품목',r=>esc(r.product_name||'')],['금액',r=>won(r.vat_amount)]],data||[]));}
+  }catch(e){box.innerHTML='<div class="muted" style="color:var(--blocked);font-size:11.5px">조회 실패: '+esc(e.message||String(e))+'</div>';}
+}
 // ===== 부가세신고 양식 자동생성 =====
 // 원본 양식: 채널 | 프로젝트 | 판매품목 | 과세/면세 | 기타(건별+휴대폰) | 부가세신고금액(V+) | 판매수량 | 원가(V-) | 총원가(V-) | 원가율
 async function loadVatReport(){

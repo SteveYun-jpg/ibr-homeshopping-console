@@ -160,6 +160,9 @@ body.collapsed .sideuser{justify-content:center;padding:11px 0 4px}
 .btn{background:var(--surface);border:1px solid var(--line1);color:var(--ink2);font-weight:600;padding:8px 13px;border-radius:var(--rb);font-size:13px;cursor:pointer}
 .btn:hover{border-color:var(--brand)}.btn.primary{background:var(--brand-grad);border:none;color:#fff}.btn.ghost{background:transparent}.btn.sm{padding:6px 11px;font-size:12.5px}
 main{padding:22px 30px 36px;width:100%}
+/* 워크플로우는 글로벌소싱 콘솔처럼 화면을 꽉 채운다 — main 여백 상쇄 + 뷰포트 높이 */
+main:has(> #v-workflow.active),body.wf-full main{padding:0;height:100vh;display:flex;flex-direction:column}
+#v-workflow.active{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 18px 16px;box-sizing:border-box}
 .view{display:none}.view.active{display:block}
 .sechead{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
 h2.sec{font-size:16px;margin:0;color:var(--ink1)}
@@ -1064,6 +1067,7 @@ function navTo(v,push){if(push===undefined)push=true;
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
   if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
+  document.body.classList.toggle('wf-full',v==='workflow');   // 워크플로우는 여백 없이 꽉 채움
   if(window.innerWidth<760)document.body.classList.add('collapsed');
   scrollTo({top:0,behavior:'smooth'});
   if(push)pushView(v);
@@ -3749,7 +3753,7 @@ async function loadWorkflow(){
   }
   if(!window.SuniverseWF){$('v-workflow').innerHTML='<div class="state" style="padding:40px">워크플로우 모듈을 불러오지 못했습니다.</div>';return;}
   WF_MOUNTED=window.SuniverseWF.mount({
-    el:$('v-workflow'), sb, tenantId:WF_TENANT, myTeam:'homeshopping', myLabel:'홈쇼핑(우리)',
+    el:$('v-workflow'), sb, tenantId:WF_TENANT, myTeam:'homeshopping', myLabel:'홈쇼핑(우리)',   // height 미지정 = 호스트 높이에 맞춰 꽉 채움
     partyKinds:['internal_team','homeshopping','agency'],
     brandLoader:async()=>{const {data}=await sb.from('hs_v_brands').select('id,name').eq('in_use',true).order('name');return data||[];},
     onCount:n=>{const b=$('wfNavBadge');if(b){b.style.display=n?'':'none';b.textContent=n;}}

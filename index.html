@@ -250,7 +250,7 @@ tbody tr:hover{background:var(--bg1)}
       <div class="nav" data-v="broadcast" data-t="방송 스케줄"><span class="lb">방송 스케줄</span></div>
       <div class="nav" data-v="settle" data-t="자사 결산"><span class="lb">자사 결산</span></div>
       <div class="nav" data-v="agency" data-t="대행 결산"><span class="lb">대행 결산</span></div>
-      <div class="nav" data-v="workflow" data-t="워크플로우"><span class="lb">워크플로우</span><span id="wfNavBadge" style="display:none;background:#E11D48;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:6px"></span></div>
+      <div class="nav" id="wfNav" data-v="workflow" data-t="워크플로우" style="display:none"><span class="lb">워크플로우</span><span id="wfNavBadge" style="display:none;background:#E11D48;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:6px"></span></div>
     </div>
     <div class="navgroup">
       <div class="gl">기준 정보</div>
@@ -1159,7 +1159,11 @@ function applyMemberGate(){
   if(AUTHED&&!ok){$('app').classList.add('hidden');if(ps){ps.style.display='flex';const nmEl=$('pendName');if(nmEl)nmEl.textContent=(ME&&ME.name)||(ME&&ME.email)||'';}}
   else{if(ps)ps.style.display='none';$('app').classList.toggle('hidden',!AUTHED);}
   const mb=$('memberNav');if(mb)mb.style.display=isAdmin()?'':'none';
+  // 워크플로우: 준비 중이라 대표 계정에서만 노출 (팀원 혼선 방지)
+  const wn=$('wfNav');if(wn)wn.style.display=wfAllowed()?'':'none';
 }
+// 워크플로우 접근 허용 계정
+function wfAllowed(){return !!(ME&&(ME.email==='dbswlghd@gmail.com'||ME.user_id==='11111111-0000-0000-0000-000000000001'));}
 $('pendLogout')&&($('pendLogout').onclick=async()=>{try{localStorage.removeItem('hsLogin');}catch(_){}window._hsAuto=false;await sb.auth.signOut();location.reload();});
 // ===== 직원 관리 (관리자 전용) =====
 const GRADES=['직원','팀장','임원','경영진'];
@@ -3242,6 +3246,7 @@ const WF_HS_KINDS=['internal_team','homeshopping','agency'];   // 홈쇼핑 관�
 function wfSteps(key){const f=WF.flows[key];return (f&&f.stages)||[];}
 async function loadWorkflow(){
   if(!AUTHED){$('wfList').innerHTML='<div class="state" style="padding:22px">로그인 후 표시</div>';return;}
+  if(typeof wfAllowed==='function'&&!wfAllowed()){navTo('home');return;}   // 준비 중 — 대표 계정 전용
   try{const {data:{user}}=await sb.auth.getUser();WF.uid=user&&user.id;}catch(_){}
   if(!WF.parties.length){
     const [{data:ps},{data:fs}]=await Promise.all([

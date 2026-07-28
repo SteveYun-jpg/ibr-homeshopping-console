@@ -255,6 +255,7 @@ tbody tr:hover{background:var(--bg1)}
     <div class="navgroup">
       <div class="gl">기준 정보</div>
       <div class="nav" data-v="config" data-t="라인·세트 구성"><span class="lb">라인·세트 구성</span></div>
+      <div class="nav" data-v="ppl" data-t="PPL 프로그램"><span class="lb">PPL 프로그램</span></div>
     </div>
     <div class="navgroup">
       <div class="gl">분석 · 재고</div>
@@ -369,7 +370,7 @@ tbody tr:hover{background:var(--bg1)}
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 방송 시작 <span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
             <div class="row3"><div><label>주문매출목표</label><input type="text" inputmode="numeric" id="fTarget"></div><div><label>순매출목표</label><input type="text" inputmode="numeric" id="fNet"></div><div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
-            <div class="row3"><div><label>프로그램/차수</label><input id="fProg"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><input id="fPpl" placeholder="프로그램명" style="display:none;flex:1.4"><input id="fPplCost" type="number" placeholder="비용(원)" style="display:none;flex:1;min-width:0"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
+            <div class="row3"><div><label>프로그램/차수</label><input id="fProg"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:13px"><div><label>쇼호스트</label><input id="fHost" placeholder="쇼호스트명"></div><div><label>PD</label><input id="fPd" placeholder="PD명"></div><div><label>담당 MD</label><input id="fMd" list="gsmd" placeholder="MD명"><datalist id="gsmd"><option>박민주 부장</option><option>장효석 이사</option><option>민정현 주임</option><option>한수진 과장</option><option>빅토리아 이사(외부)</option></datalist></div><div><label>색상</label><input type="color" id="fColor" value="#0D9488" style="width:48px;height:38px;padding:2px;border:1px solid var(--line1);border-radius:9px;cursor:pointer"></div></div>
             <label style="font-size:11.5px;color:var(--ink3);display:block;margin:4px 0 4px">사후미팅 메모</label>
             <textarea id="fPost" rows="2" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea>
@@ -520,6 +521,18 @@ tbody tr:hover{background:var(--bg1)}
             <div id="wfSide" style="padding:10px 12px;max-height:600px;overflow:auto"><div class="muted" style="font-size:11.5px">스레드를 선택하면 첨부 자료가 모입니다.</div></div>
           </div>
         </div>
+      </div>
+
+      <!-- PPL 프로그램 마스터 -->
+      <div class="view" id="v-ppl">
+        <div class="sechead"><h2 class="sec">PPL 프로그램</h2><span class="tag">방송사·프로그램·회당 비용</span>
+          <div class="spacer"></div>
+          <button class="btn sm" id="pplAdd">+ 프로그램 추가</button>
+          <button class="btn primary sm" id="pplSave" style="margin-left:6px">저장</button>
+        </div>
+        <p class="hint">여기 등록한 프로그램이 <b>방송 편성 입력 → PPL 「유」</b> 선택 시 목록으로 나옵니다. <b>회당 비용</b>을 넣어두면 편성에서 자동으로 채워지고(방송별로 수정 가능), 결산 손익에서 비용으로 차감됩니다. 면세 방송은 PPL 부가세가 실비용이라 VAT포함으로 차감됩니다.</p>
+        <div class="scroll" id="pplSummary" style="margin-bottom:12px"></div>
+        <div class="card scroll" style="padding:0"><table id="t_ppl"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
       </div>
 
       <!-- 의견 설문 (콘솔 사용성) -->
@@ -1008,7 +1021,7 @@ function navTo(v,push){if(push===undefined)push=true;
   const navEl=document.querySelector('.nav[data-v="'+v+'"]')||document.querySelector('.rb[data-v="'+v+'"]');if(navEl)navEl.classList.add('active');
   const view=$('v-'+v);if(view)view.classList.add('active');
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
-  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();
+  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   if(window.innerWidth<760)document.body.classList.add('collapsed');
   scrollTo({top:0,behavior:'smooth'});
@@ -1450,6 +1463,87 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
 
+// ===== PPL 프로그램 마스터 =====
+let PPLM=[],PPL_DIRTY={},PPL_USE={};
+async function loadPplMaster(){
+  if(!AUTHED)return;
+  const [{data:ps},{data:used}]=await Promise.all([
+    sb.from('hs_ppl').select('*').order('broadcaster').order('program'),
+    sb.from('hs_schedules').select('ppl_id,ppl_cost').not('ppl_id','is',null)]);
+  PPLM=(ps||[]).map(p=>({...p}));PPL_DIRTY={};
+  PPL_USE={};(used||[]).forEach(s=>{const u=PPL_USE[s.ppl_id]=PPL_USE[s.ppl_id]||{n:0,noCost:0};u.n++;if(!(+s.ppl_cost))u.noCost++;});
+  const noCostBc=Object.values(PPL_USE).reduce((a,u)=>a+u.noCost,0);
+  const noUnit=PPLM.filter(p=>!(+p.unit_cost)).length;
+  $('pplSummary').innerHTML='<div class="kpis" style="margin:0">'
+    +`<div class="kpi brand"><div class="l">등록 프로그램</div><div class="v">${PPLM.length}개</div></div>`
+    +`<div class="kpi"><div class="l">회당 비용 미입력</div><div class="v">${noUnit}개</div><div class="s">기본 비용을 넣으면 편성에서 자동 반영</div></div>`
+    +`<div class="kpi ${noCostBc?'warn':''}"><div class="l">PPL 비용 0원 방송</div><div class="v">${noCostBc}건</div><div class="s">손익이 과대 계상됩니다</div></div>`
+    +'</div>';
+  renderPplMaster();
+}
+function renderPplMaster(){
+  tbl('t_ppl',[
+    {h:'방송사',l:1,f:p=>`<input class="cell2 pplF" data-id="${p.id}" data-f="broadcaster" value="${esc(p.broadcaster||'')}" style="width:88px">`},
+    {h:'프로그램',l:1,f:p=>`<input class="cell2 pplF" data-id="${p.id}" data-f="program" value="${esc(p.program||'')}" style="width:170px">`},
+    {h:'회당 비용(VAT별도)',f:p=>`<input class="cell2 pplF" data-id="${p.id}" data-f="unit_cost" inputmode="numeric" value="${p.unit_cost!=null?Number(p.unit_cost).toLocaleString('ko-KR'):''}" placeholder="예: 3,000,000" style="width:120px;text-align:right">`},
+    {h:'과세',l:1,f:p=>`<select class="pplF" data-id="${p.id}" data-f="tax_type" style="width:74px"><option ${p.tax_type==='과세'?'selected':''}>과세</option><option ${p.tax_type==='면세'?'selected':''}>면세</option></select>`},
+    {h:'매체/대행',l:1,f:p=>`<input class="cell2 pplF" data-id="${p.id}" data-f="agency" value="${esc(p.agency||'')}" style="width:110px">`},
+    {h:'메모',l:1,f:p=>`<input class="cell2 pplF" data-id="${p.id}" data-f="note" value="${esc(p.note||'')}" style="width:150px">`},
+    {h:'사용 방송',f:p=>{const u=PPL_USE[p.id];return u?`${u.n}건${u.noCost?` <span style="color:var(--blocked)">(비용0 ${u.noCost})</span>`:''}`:'<span class="muted">–</span>';}},
+    {h:'사용',f:p=>`<input type="checkbox" class="pplF" data-id="${p.id}" data-f="active" ${p.active!==false?'checked':''}>`},
+    {h:'',f:p=>`<button class="pplDel" data-id="${p.id}" title="삭제" style="border:none;background:transparent;color:var(--blocked);cursor:pointer;font-size:15px">✕</button>`}
+  ],PPLM,'등록된 PPL이 없습니다 — [+ 프로그램 추가]',()=>{
+    document.querySelectorAll('#t_ppl .pplF').forEach(el=>el.addEventListener('change',()=>{
+      const id=el.dataset.id,f=el.dataset.f;let v=el.type==='checkbox'?el.checked:el.value;
+      if(f==='unit_cost')v=v===''?null:Math.round(+String(v).replace(/[,\s원]/g,'')||0);
+      const row=PPLM.find(x=>x.id===id);if(row)row[f]=v;
+      (PPL_DIRTY[id]=PPL_DIRTY[id]||{})[f]=v;
+      if(f==='unit_cost')renderPplMaster();
+    }));
+    document.querySelectorAll('#t_ppl .pplDel').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.id,u=PPL_USE[id];
+      if(u&&u.n){toast(`사용 중인 PPL입니다(${u.n}건) — 삭제 대신 「사용」 체크를 해제하세요`,'warn');return;}
+      if(!confirm('이 PPL 프로그램을 삭제할까요?'))return;
+      if(!String(id).startsWith('new_')){const {error}=await sb.from('hs_ppl').delete().eq('id',id);if(error){toast('삭제 실패: '+error.message,'err');return;}}
+      PPLM=PPLM.filter(x=>x.id!==id);delete PPL_DIRTY[id];renderPplMaster();toast('삭제됨','ok');
+    });
+  },null,{filter:true});
+}
+$('pplAdd')&&($('pplAdd').onclick=()=>{const id='new_'+Date.now();
+  PPLM.unshift({id,broadcaster:'',program:'',unit_cost:null,tax_type:'과세',agency:'',note:'',active:true,sort_no:100});
+  PPL_DIRTY[id]={_new:true};renderPplMaster();});
+$('pplSave')&&($('pplSave').onclick=async()=>{
+  const who=(ME&&ME.name)||$('who').textContent;
+  const ins=[],ups=[];
+  PPLM.forEach(p=>{
+    const d=PPL_DIRTY[p.id];if(!d)return;
+    if(!p.broadcaster||!p.program)return;
+    const row={broadcaster:p.broadcaster.trim(),program:p.program.trim(),unit_cost:p.unit_cost,tax_type:p.tax_type||'과세',agency:p.agency||null,note:p.note||null,active:p.active!==false,updated_at:new Date().toISOString(),updated_by:who};
+    if(String(p.id).startsWith('new_'))ins.push(row); else ups.push({...row,id:p.id});
+  });
+  if(!ins.length&&!ups.length){toast('변경사항 없음','warn');return;}
+  const btn=$('pplSave');btn.disabled=true;btn.textContent='저장 중…';
+  let err=null;
+  if(ins.length){const {error}=await sb.from('hs_ppl').insert(ins);err=err||error;}
+  for(const u of ups){const {id,...rest}=u;const {error}=await sb.from('hs_ppl').update(rest).eq('id',id);err=err||error;}
+  btn.disabled=false;btn.textContent='저장';
+  if(err){toast('저장 실패: '+err.message,'err');return;}
+  toast('PPL 저장됨 · 편성에서 선택할 수 있습니다','ok');
+  await loadPplMaster();await loadPplOptions(true);
+});
+// 편성 화면용 PPL 옵션
+let PPL_OPTS=[];
+async function loadPplOptions(force){
+  if(PPL_OPTS.length&&!force)return;
+  const {data}=await sb.from('hs_ppl').select('id,broadcaster,program,unit_cost,tax_type').eq('active',true).order('broadcaster').order('program');
+  PPL_OPTS=data||[];
+  const sel=$('fPplSel');if(!sel)return;
+  const cur=sel.value;
+  const by={};PPL_OPTS.forEach(p=>{(by[p.broadcaster]=by[p.broadcaster]||[]).push(p);});
+  sel.innerHTML='<option value="">— PPL 프로그램 선택 —</option>'
+    +Object.keys(by).map(b=>`<optgroup label="${esc(b)}">`+by[b].map(p=>`<option value="${p.id}">${esc(p.program)}${p.unit_cost?' · '+won(p.unit_cost)+'원':' · 비용미등록'}</option>`).join('')+'</optgroup>').join('');
+  if(cur)sel.value=cur;
+}
 // ===== 월별 정산 검수 (체크리스트 · 사인오프 · 재검수 감지) =====
 const AUDIT_ITEMS=[
   ['format','형식 이상 (합계행·수량0·과세구분 누락)','anomaly_rows'],
@@ -1457,6 +1551,7 @@ const AUDIT_ITEMS=[
   ['only_bc','방송만 있고 정산 미도착','only_bc'],
   ['only_settle','정산만 있고 편성 없음','only_settle'],
   ['gap','잠정↔확정 차이 20% 이상','big_gap'],
+  ['ppl','PPL 비용 미입력 (프로그램만 있고 금액 0)','ppl_no_cost'],
   ['brand','정산 브랜드 미분류','brand_null']
 ];
 let AUD={rows:[],cur:null};
@@ -1560,6 +1655,9 @@ async function auditDetail(ym,key){
       else if(key==='only_settle')rows=rows.filter(r=>r['상태']==='정산만 있음(편성 없음)');
       else rows=rows.filter(r=>r['상태']==='양쪽 있음'&&Math.abs(+r['차이%']||0)>=20);
       box.innerHTML=wrap('편성 ↔ 정산 대사',tab([['홈사',r=>esc(r['홈사']||'')],['브랜드',r=>esc(r['브랜드']||'')],['방송수',r=>r['방송수']||'–'],['잠정매출',r=>eok(r['잠정매출'])],['확정매출',r=>eok(r['확정매출_영업'])],['차이%',r=>r['차이%']!=null?r['차이%']+'%':'–'],['상태',r=>esc(r['상태']||'')]],rows));}
+    else if(key==='ppl'){const {data}=await sb.from('hs_schedules').select('id,product_name,air_at,channel_id,ppl_note,ppl_cost').gte('air_at',ym+'-01').lte('air_at',ym+'-31T23:59:59').not('ppl_note','is',null);
+      const rows=(data||[]).filter(s=>String(s.ppl_note||'').trim()&&!(+s.ppl_cost));
+      box.innerHTML=wrap('PPL 비용 미입력 방송',tab([['방송일',r=>(r.air_at||'').slice(0,10)],['홈사',r=>esc(BCH[r.channel_id]||'')],['제품',r=>esc((r.product_name||'').slice(0,20))],['PPL',r=>esc(r.ppl_note||'')],['조치',()=>'방송 상세 → PPL 비용 입력']],rows));}
     else if(key==='brand'){const {data}=await sb.from('hs_settle_raw').select('product_name,channel_id,vat_amount').eq('settle_month',ym).is('brand_id',null);
       box.innerHTML=wrap('브랜드 미분류 정산행',tab([['홈사',r=>esc(BCH[r.channel_id]||'')],['품목',r=>esc(r.product_name||'')],['금액',r=>won(r.vat_amount)]],data||[]));}
   }catch(e){box.innerHTML='<div class="muted" style="color:var(--blocked);font-size:11.5px">조회 실패: '+esc(e.message||String(e))+'</div>';}
@@ -2581,7 +2679,24 @@ function bcTimes(){const base=(BC&&BC.air_at)?new Date(BC.air_at):new Date();con
   const[ah,am]=at.split(':').map(Number);const start=new Date(y,mo,d,ah||0,am||0,0);
   let end=null;if(et){const[eh,em]=et.split(':').map(Number);end=new Date(y,mo,d,eh||0,em||0,0);if(end<=start)end=new Date(end.getTime()+864e5);}
   return{startIso:start.toISOString(),endIso:end?end.toISOString():null};}
-$('fPplYn').onchange=()=>{const on=$('fPplYn').value==='유';$('fPpl').style.display=on?'block':'none';$('fPplCost').style.display=on?'block':'none';if(!on){$('fPpl').value='';$('fPplCost').value='';}};
+function pplToggle(on){
+  const sel=$('fPplSel'),cost=$('fPplCost'),hint=$('fPplHint');
+  if(sel)sel.style.display=on?'block':'none';
+  if(cost)cost.style.display=on?'block':'none';
+  if(hint)hint.style.display=on?'block':'none';
+  if(!on){if(sel)sel.value='';if(cost)cost.value='';if($('fPpl'))$('fPpl').value='';if(hint)hint.textContent='';}
+}
+$('fPplYn').onchange=()=>{const on=$('fPplYn').value==='유';pplToggle(on);if(on)loadPplOptions();};
+$('fPplSel')&&($('fPplSel').onchange=()=>{
+  const id=$('fPplSel').value,p=PPL_OPTS.find(x=>x.id===id);
+  if(!p){$('fPpl').value='';$('fPplHint').textContent='';return;}
+  $('fPpl').value=p.broadcaster+' '+p.program;   // 표기·보고멘트 호환
+  if(!$('fPplCost').value||!(+String($('fPplCost').value).replace(/[,\s]/g,'')))
+    $('fPplCost').value=p.unit_cost!=null?Number(p.unit_cost).toLocaleString('ko-KR'):'';
+  $('fPplHint').innerHTML=p.unit_cost!=null
+    ? `기본 회당 ${won(p.unit_cost)}원 (${esc(p.tax_type||'과세')}) · 이 방송만 다르면 금액을 고쳐주세요`
+    : `<span style="color:var(--gold)">이 프로그램은 회당 비용이 등록돼 있지 않습니다 — PPL 프로그램 탭에서 등록하면 자동 반영됩니다</span>`;
+});
 let PICKERS=false;
 let PICKP=[],PICK_CORENAME={},PRESETS=[];
 async function loadPresets(){const {data}=await sb.from('hs_set_preset').select('*').eq('active',true).order('tier_order');PRESETS=data||[];}
@@ -3025,7 +3140,16 @@ async function showBcForm(push){const s=BC;
   $('fAgency').value=s.agency_fee_rate?Math.round(s.agency_fee_rate*1000)/10:'';   // setDealSeg보다 먼저 채워야 기준값이 덮어쓰지 않음
   setFeeSeg(s.fee_type||'정액');setDealSeg(s.deal_type||'자사');$('fFixed').value=withComma(s.fee_amount);$('fRate').value=s.commission_rate?Math.round(s.commission_rate*100):'';
   $('fTarget').value=withComma(s.target_sales);$('fNet').value=withComma(s.net_target);$('fConv').value=s.conv_rate?Math.round(s.conv_rate*100):'';$('fTax').value=s.tax_type||'면세';$('fProg').value=s.program_name||'';
-  {const hasPpl=!!(s.ppl_note||s.ppl_cost);$('fPpl').value=s.ppl_note||'';$('fPplCost').value=s.ppl_cost||'';$('fPplYn').value=hasPpl?'유':'무';$('fPpl').style.display=hasPpl?'block':'none';$('fPplCost').style.display=hasPpl?'block':'none';}
+  {const hasPpl=!!(s.ppl_note||s.ppl_cost||s.ppl_id);
+   $('fPpl').value=s.ppl_note||'';
+   $('fPplCost').value=s.ppl_cost!=null?Number(s.ppl_cost).toLocaleString('ko-KR'):'';
+   $('fPplYn').value=hasPpl?'유':'무';pplToggle(hasPpl);
+   if(hasPpl)loadPplOptions().then(()=>{const sel=$('fPplSel');if(!sel)return;
+     if(s.ppl_id)sel.value=s.ppl_id;
+     else{const m=PPL_OPTS.find(p=>(p.broadcaster+' '+p.program)===String(s.ppl_note||'').trim());if(m)sel.value=m.id;}
+     const p=PPL_OPTS.find(x=>x.id===sel.value);
+     if(p&&$('fPplHint'))$('fPplHint').innerHTML=p.unit_cost!=null?`기본 회당 ${won(p.unit_cost)}원 (${esc(p.tax_type||'과세')})`:'<span style="color:var(--gold)">회당 비용 미등록</span>';
+     else if($('fPplHint')&&s.ppl_note)$('fPplHint').innerHTML='<span style="color:var(--gold)">목록에 없는 PPL: '+esc(s.ppl_note)+' — PPL 프로그램 탭에 등록해 주세요</span>';});}
   $('fCost').value=Math.round((s.cost_rate??0.27)*100);$('fBack').value=Math.round((s.backmargin_rate??0.12)*100);
   $('fComp').value=(s.competitors||[]).map(x=>`${x.channel} - ${x.product}`).join('\n');$('fPost').value=s.postmeeting||'';
   $('fHost').value=s.show_host||'';$('fPd').value=s.pd||'';$('fMd').value=s.md||'';
@@ -3248,7 +3372,10 @@ function bcMissing(){const m=[];BC_REQ.forEach(([id,l])=>{if(fldEmpty(id))m.push
   if(!dealAgy&&fee==='정액'&&fldEmpty('fFixed'))m.push('특약비');
   if((dealAgy||fee==='정률')&&fldEmpty('fRate'))m.push('수수료율');
   if(dealAgy&&fldEmpty('fAgency'))m.push('대행수수료');
-  if($('fPplYn')&&$('fPplYn').value==='유'&&fldEmpty('fPpl'))m.push('PPL 내용');
+  if($('fPplYn')&&$('fPplYn').value==='유'){
+    if(!($('fPplSel')&&$('fPplSel').value))m.push('PPL 프로그램');
+    if(fldEmpty('fPplCost'))m.push('PPL 비용');
+  }
   return m;}
 function updateSaveGate(){const hard=bcMissingHard(),soft=bcMissing(),bad=hard.length>0;
   ['saveSchedule','saveBc'].forEach(id=>{const b=$(id);if(b){b.disabled=bad;b.style.opacity=bad?.5:1;b.style.cursor=bad?'not-allowed':'';b.title=bad?('저장 필수 미입력: '+hard.join(', ')):(soft.length?('미입력(나중에 가능): '+soft.join(', ')):'');}});
@@ -3261,7 +3388,7 @@ async function saveSchedule(silent){
   const miss=bcMissingHard();
   if(miss.length){toast('저장 최소 필수: '+miss.join(', '),'err');updateSaveGate();return false;}
   const dur=(airIso&&endIso)?Math.max(0,Math.round((new Date(endIso)-new Date(airIso))/60000)):null;
-  const row={channel_id:$('fChannel').value,brand_id:($('fBrand')&&$('fBrand').value)||null,line:($('fLineTop')&&$('fLineTop').value)||null,product_name:$('fProduct').value||'새 방송',air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:feeType==='정액'?(num('fFixed')||null):null,commission_rate:(feeType==='정률'||dealType==='대행')?(+$('fRate').value/100||null):null,agency_fee_rate:(dealType==='대행')?(+$('fAgency').value/100||null):null,target_sales:num('fTarget')||0,net_target:num('fNet')||null,conv_rate:$('fConv').value?(+$('fConv').value/100):null,tax_type:$('fTax').value,program_name:$('fProg').value,ppl_note:($('fPplYn').value==='유'?($('fPpl').value||null):null),ppl_cost:($('fPplYn').value==='유'?(+$('fPplCost').value||null):null),cost_rate:(+$('fCost').value||27)/100,backmargin_rate:(+$('fBack').value||12)/100,competitors:comp,postmeeting:$('fPost').value,show_host:$('fHost').value||null,pd:$('fPd').value||null,md:$('fMd').value||null,color:$('fColor').value||null,updated_by:$('who').textContent};
+  const row={channel_id:$('fChannel').value,brand_id:($('fBrand')&&$('fBrand').value)||null,line:($('fLineTop')&&$('fLineTop').value)||null,product_name:$('fProduct').value||'새 방송',air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:feeType==='정액'?(num('fFixed')||null):null,commission_rate:(feeType==='정률'||dealType==='대행')?(+$('fRate').value/100||null):null,agency_fee_rate:(dealType==='대행')?(+$('fAgency').value/100||null):null,target_sales:num('fTarget')||0,net_target:num('fNet')||null,conv_rate:$('fConv').value?(+$('fConv').value/100):null,tax_type:$('fTax').value,program_name:$('fProg').value,ppl_note:($('fPplYn').value==='유'?($('fPpl').value||null):null),ppl_cost:($('fPplYn').value==='유'?(num('fPplCost')||null):null),ppl_id:($('fPplYn').value==='유'?(($('fPplSel')&&$('fPplSel').value)||null):null),cost_rate:(+$('fCost').value||27)/100,backmargin_rate:(+$('fBack').value||12)/100,competitors:comp,postmeeting:$('fPost').value,show_host:$('fHost').value||null,pd:$('fPd').value||null,md:$('fMd').value||null,color:$('fColor').value||null,updated_by:$('who').textContent};
   const wasNew=!!BC.__new;let err=null;
   if(wasNew){const st=(dealType==='대행')?'예정':'작성중';   // 자사는 구성 저장까지 마쳐야 '예정'으로 확정
     const {data,error}=await sb.from('hs_schedules').insert({...row,status:st,tenant_id:BC.tenant_id||null}).select().single();

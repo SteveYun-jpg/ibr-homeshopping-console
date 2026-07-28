@@ -517,35 +517,39 @@ tbody tr:hover{background:var(--bg1)}
 
       <!-- 워크플로우 · 거래처 업무 협업 (3분할) -->
       <div class="view" id="v-workflow">
-        <div class="sechead"><h2 class="sec">워크플로우</h2><span class="tag">거래처 업무 협업</span>
+        <div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px">
+          <h2 class="sec" style="margin:0">워크플로우</h2>
+          <span class="muted" style="font-size:12.5px">· 거래처 업무 협업</span>
           <div class="spacer"></div>
-          <input id="wfSearch" class="hsearch" placeholder="요청·자료 검색" style="max-width:200px;margin-right:8px">
+          <input id="wfSearch" class="hsearch" placeholder="🔎 요청·자료 전체 검색" style="max-width:280px;margin-right:8px">
           <button class="btn primary sm" id="wfNewBtn">+ 새 스레드</button>
         </div>
-        <p class="hint">브랜드 × 거래처 단위 <b>상시 스레드</b>입니다. 글로벌소싱·홈쇼핑사·대행사와 <b>요청·회신·자료</b>를 순서대로 주고받습니다. 글로벌소싱과 같은 스레드를 양쪽에서 봅니다.</p>
-        <div id="wfGrid" style="display:grid;grid-template-columns:288px 1fr 296px;gap:12px;align-items:start">
+        <div id="wfGrid" style="display:grid;grid-template-columns:288px minmax(0,1fr) 296px;background:#fff;border:1px solid var(--line1);border-radius:12px;overflow:hidden;height:calc(100vh - 132px);min-height:540px">
           <!-- ① 스레드 리스트 -->
-          <div class="card" style="padding:0;overflow:hidden">
-            <div style="padding:10px 12px;border-bottom:1px solid var(--line1);display:flex;align-items:center;gap:6px">
-              <b style="font-size:12.5px">스레드 <span id="wfCount">0</span></b>
+          <div style="display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line1)">
+            <div style="padding:12px 14px 8px;display:flex;align-items:center;gap:8px">
+              <b style="font-size:13px">스레드 · <span id="wfCount">0</span></b>
+              <div class="spacer"></div>
+              <button class="btn sm" id="wfNewBtn2" style="padding:3px 10px;font-size:11.5px">+ 새로</button>
             </div>
-            <div style="padding:10px 12px;display:flex;gap:6px;flex-wrap:wrap" id="wfFilters">
+            <div style="padding:0 12px 10px;display:flex;gap:5px;flex-wrap:wrap" id="wfFilters">
               <button class="wfChip on" data-f="all">전체</button>
               <button class="wfChip" data-f="open">미회신</button>
               <button class="wfChip" data-f="ext">외부 거래처</button>
               <button class="wfChip" data-f="mine">내 담당</button>
               <button class="wfChip" data-f="src" title="글로벌소싱 콘솔이 만든 공급사·관세사·포워더 스레드">소싱·물류</button>
             </div>
-            <div id="wfList" style="max-height:620px;overflow:auto"><div class="state" style="padding:22px">로그인 후 표시</div></div>
+            <div id="wfList" style="flex:1;overflow:auto;border-top:1px solid var(--line1)"><div class="state" style="padding:22px">로그인 후 표시</div></div>
+            <div class="muted" style="padding:10px 14px;border-top:1px solid var(--line1);font-size:10.5px;line-height:1.55">스레드 = 브랜드 × 거래처. 글로벌소싱팀도 홈쇼핑사·대행사처럼 하나의 거래처입니다. 방송이 끝나도 계속 이어집니다.</div>
           </div>
           <!-- ② 스레드 상세 -->
-          <div class="card" style="padding:0;overflow:hidden;min-height:420px">
-            <div id="wfDetail"><div class="state" style="padding:60px 20px">왼쪽에서 스레드를 선택하거나 <b>+ 새 스레드</b>로 시작하세요.</div></div>
+          <div id="wfDetail" style="display:flex;flex-direction:column;min-width:0;overflow:hidden">
+            <div class="state" style="padding:60px 20px">왼쪽에서 스레드를 선택하거나 <b>+ 새 스레드</b>로 시작하세요.</div>
           </div>
           <!-- ③ 자료함 / 어시스트 -->
-          <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;flex-direction:column;min-width:0;border-left:1px solid var(--line1)">
             <div class="toolbar seg" id="wfSideTabs" style="margin:0;border-radius:0"><button class="on" data-v="files">자료함</button><button data-v="ai">🤖 어시스트</button></div>
-            <div id="wfSide" style="padding:10px 12px;max-height:600px;overflow:auto"><div class="muted" style="font-size:11.5px">스레드를 선택하면 첨부 자료가 모입니다.</div></div>
+            <div id="wfSide" style="flex:1;overflow:auto;padding:12px 14px"><div class="muted" style="font-size:11.5px">스레드를 선택하면 첨부 자료가 모입니다.</div></div>
           </div>
         </div>
       </div>
@@ -3734,6 +3738,8 @@ async function loadWorkflow(){
     WF.parties=ps||[];(fs||[]).forEach(f=>WF.flows[f.key]=f);
   }
   await wfLoadThreads();
+  // 글로벌소싱 콘솔과 동일하게 첫 스레드를 자동으로 열어둔다
+  if(!WF.cur){const first=(document.querySelector('#wfList .wfRow'));if(first)wfOpen(first.dataset.id);}
   wfSubscribe();
 }
 async function wfLoadThreads(){
@@ -3776,7 +3782,7 @@ function wfRenderList(){
       <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
         <span style="width:6px;height:6px;border-radius:50%;background:${ext?'#F59E0B':'#0D9488'};display:inline-block;flex:0 0 auto"></span>
         <span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((t.party||{}).name||'')}</span>
-        <span style="font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:5px;background:${ext?'#FEF3C7':'var(--bg2)'};color:${ext?'#92400E':'var(--ink3)'};flex:0 0 auto">${ext?'외부':'내부'}</span></div>
+        <span style="font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:5px;background:${ext?'#FEF3C7':'var(--bg2)'};color:${ext?'#92400E':'var(--ink3)'};flex:0 0 auto">${ext?'외부':'자사'}</span></div>
       <div style="display:flex;align-items:center;margin-top:6px">
         ${stepNm?`<span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:11px;background:#D7F0EC;color:#0B6B62">${esc(stepNm)}</span>`:'<span></span>'}
         <div class="spacer"></div>
@@ -3822,8 +3828,8 @@ function wfRenderDetail(){
         <div class="wfStep" data-k="${s.key}" style="cursor:pointer;text-align:center;width:66px">
           ${circle}<div style="font-size:10.5px;margin-top:5px;font-weight:${cur?700:500};color:${cur?'var(--ink1)':'var(--ink3)'}">${esc(s.name)}</div></div>
         ${line}</div>`;}).join('')+`</div></div>`;
-  // 교환 원장 (카드형)
-  h+='<div id="wfLedger" style="padding:0 18px 12px;max-height:340px;overflow:auto;background:var(--bg1)">';
+  // 교환 원장 (카드형) — 남는 높이를 모두 사용
+  h+='<div id="wfLedger" style="flex:1;min-height:0;padding:0 18px 12px;overflow:auto;background:var(--bg1)">';
   if(!WF.msgs.length)h+='<div class="state" style="padding:34px">아직 주고받은 내용이 없습니다. 아래에서 요청·자료를 올려보세요.</div>';
   else h+='<div style="padding-top:12px">'+WF.msgs.map(m=>{const [lb,col]=wfMsgBadge(m.kind),mine=m.author_id===WF.uid;
     const st=(wfSteps(wfFlowKey(t)).find(s=>s.key===m.workflow_step)||{}).name||'';
@@ -3940,6 +3946,7 @@ $('wfNewBtn')&&($('wfNewBtn').onclick=async()=>{
   $('wfN_party').onchange=()=>{const p=WF.parties.find(x=>x.id===$('wfN_party').value);if(p)$('wfN_wf').value=wfFlowFor(p);};
   $('wfN_party').onchange();
   $('wfNewMask').style.display='flex';});
+$('wfNewBtn2')&&($('wfNewBtn2').onclick=()=>$('wfNewBtn').click());
 $('wfNewClose')&&($('wfNewClose').onclick=()=>$('wfNewMask').style.display='none');
 $('wfN_save')&&($('wfN_save').onclick=async()=>{
   const bid=$('wfN_brand').value,pid=$('wfN_party').value,wk=$('wfN_wf').value;

@@ -28,6 +28,17 @@
   function ensureCss(){if(document.querySelector('link[data-suwf]'))return;
     var l=document.createElement('link');l.rel='stylesheet';l.href=CSS_URL;l.setAttribute('data-suwf','1');document.head.appendChild(l);}
 
+  var CMSG={co_message_kind_chk:'메시지 종류 값이 잘못되었습니다.',co_message_status_chk:'요청 상태 값이 잘못되었습니다.',co_channel_pairkey_uq:'같은 브랜드·거래처 스레드가 이미 있습니다.'};
+  function dbMsg(e){if(!e)return '';var m=String(e.message||e||''),mm;
+    if((mm=m.match(/violates check constraint "([^"]+)"/)))return CMSG[mm[1]]||'입력값이 허용 범위를 벗어났습니다 ('+mm[1]+').';
+    if((mm=m.match(/null value in column "([^"]+)"/)))return '필수 입력이 비어 있습니다: '+mm[1];
+    if(/duplicate key value/.test(m))return '이미 같은 값이 등록되어 있습니다.';
+    if(/violates foreign key/.test(m))return '연결된 기준정보가 없습니다. 목록에서 다시 선택해주세요.';
+    if(/row-level security|permission denied/i.test(m)||e.code==='42501')return '권한이 없습니다. 담당 팀만 저장할 수 있습니다.';
+    if(/JWT|not authenticated|Invalid API key/i.test(m))return '로그인이 만료되었습니다. 새로고침 후 다시 로그인해주세요.';
+    if(/Failed to fetch|NetworkError/i.test(m))return '네트워크 연결이 끊겼습니다. 잠시 후 다시 시도해주세요.';
+    return m;}
+
   var KIND_BADGE={request:['요청','#F59E0B'],reply:['회신','#3B82F6'],doc:['자료','#0D9488'],note:['메모','#94A3B8']};
   var KIND_LABEL={internal_team:'자사',homeshopping:'홈사',agency:'대행사',brand_supplier:'공급사',customs:'관세사',forwarder:'포워더',distributor:'판매처'};
   var HS_KINDS=['internal_team','homeshopping','agency'];
@@ -245,7 +256,7 @@
       var btn=$('suwfSend');btn.disabled=true;
       var r=await sb.from('co_message').insert(row);
       btn.disabled=false;
-      if(r.error){$('suwfMsg').innerHTML='<span style="color:#E11D48">전송 실패: '+esc(r.error.message)+'</span>';return;}
+      if(r.error){$('suwfMsg').innerHTML='<span style="color:#E11D48">전송 실패 — '+esc(dbMsg(r.error))+'</span>';return;}
       $('suwfBody').value='';$('suwfMsg').textContent='';
       await sb.from('co_channel').update({updated_at:new Date().toISOString()}).eq('id',t.id);
       await open(t.id);loadThreads();
@@ -286,7 +297,7 @@
         var ins=await sb.from('co_channel').insert({tenant_id:opts.tenantId,kind:'object',name:brand+' · '+party.name,
           obj_module:'brand',obj_type:'brand',obj_id:bid,party_id:pid,pair_key:key,workflow_key:wk,
           current_step:(st[0]||{}).key||null,created_by:S.uid}).select().single();
-        if(ins.error){alert('스레드 생성 실패: '+ins.error.message);return;}
+        if(ins.error){alert('스레드 생성 실패 — '+dbMsg(ins.error));return;}
         ch=ins.data;
         try{await sb.from('co_channel_member').upsert({channel_id:ch.id,user_id:S.uid,role:'owner'},{onConflict:'channel_id,user_id'});}catch(e){}
       }

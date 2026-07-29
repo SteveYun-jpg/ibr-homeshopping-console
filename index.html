@@ -971,6 +971,44 @@ const CHANNELS=[['5787e453-af19-4320-a0e3-55bf1f1824eb','롯데홈쇼핑'],['71e
 const BRANDS=[['44444444-0000-0000-0000-000000000001','아티키'],['44444444-0000-0000-0000-000000000002','메리비'],['44444444-0000-0000-0000-000000000003','라메종드미엘'],['44444444-0000-0000-0000-000000000004','하커허벌']];
 const chMap=Object.fromEntries(CHANNELS.map(c=>c)), brMap=Object.fromEntries(BRANDS.map(b=>b));
 function toast(m,c){const t=$('toast');t.textContent=m;t.className='toast show '+(c||'');setTimeout(()=>t.className='toast',2500);}
+// ===== DB 오류 → 사람이 읽는 메시지 =====
+// 원문(new row violates check constraint …)을 그대로 띄우지 않는다. 어느 칸이 문제인지 알려준다.
+const FIELD_LABEL={channel_id:'홈쇼핑사',brand_id:'브랜드',line:'라인',product_name:'방송이름',air_at:'방송 시작',air_end:'방송 종료',
+ target_sales:'주문매출목표',net_target:'순매출목표',conv_rate:'전환율',tax_type:'세금',fee_type:'정산 구분',fee_amount:'특약비',
+ commission_rate:'수수료율',agency_fee_rate:'대행수수료',cost_rate:'원가율',backmargin_rate:'추가수수료율',
+ ppl_id:'PPL 프로그램',ppl_cost:'PPL 비용',ppl_note:'PPL',status:'방송 상태',deal_type:'거래 구분',
+ price:'판매가',name:'구성명',qty:'수량',preorder_qty:'미리주문 수량',onair_qty:'방송중 수량',
+ settle_month:'정산월',gross_amount:'매출총액',unit_cost:'회당 비용',broadcaster:'방송사',program:'프로그램명',
+ preset_name:'구성(프리셋)',set_code:'세트/단품 코드',brand_name:'브랜드',keyword:'키워드',rate:'요율',ym:'월'};
+const CONSTRAINT_MSG={
+ hs_schedules_status_check:'방송 상태 값이 허용 목록에 없습니다(작성중·예정·방송완료·취소). 관리자에게 알려주세요.',
+ hs_schedules_fee_type_check:'정산 구분은 정액 또는 정률만 가능합니다.',
+ co_message_kind_chk:'메시지 종류 값이 잘못되었습니다(요청·회신·자료·메모).',
+ co_message_status_chk:'요청 상태 값이 잘못되었습니다.',
+ hs_broadcast_tick_schedule_id_tick_at_key:'같은 시각의 틱이 이미 있습니다.',
+ co_channel_pairkey_uq:'같은 브랜드·거래처 스레드가 이미 있습니다.'};
+function dbMsg(e,ctx){
+  if(!e)return '';
+  const m=String(e.message||e||''),code=e.code||'';
+  let mm;
+  if((mm=m.match(/violates check constraint "([^"]+)"/)))
+    return CONSTRAINT_MSG[mm[1]]||`입력값이 허용 범위를 벗어났습니다 (${mm[1]}). 값을 확인해주세요.`;
+  if((mm=m.match(/null value in column "([^"]+)"/)))
+    return `필수 입력이 비어 있습니다: ${FIELD_LABEL[mm[1]]||mm[1]}`;
+  if((mm=m.match(/duplicate key value violates unique constraint "([^"]+)"/)))
+    return CONSTRAINT_MSG[mm[1]]||'이미 같은 값이 등록되어 있습니다.';
+  if(/violates foreign key constraint/.test(m))
+    return '연결된 기준정보가 없습니다. 목록에서 다시 선택해주세요.';
+  if((mm=m.match(/invalid input syntax for type (\w+)/)))
+    return `형식이 맞지 않습니다(${mm[1]==='numeric'||mm[1]==='integer'?'숫자':mm[1]==='date'||mm[1]==='timestamp'?'날짜/시각':mm[1]}). 값을 확인해주세요.`;
+  if(code==='42501'||/row-level security|permission denied/i.test(m))
+    return '권한이 없습니다. 이 데이터는 담당 팀만 저장할 수 있습니다.';
+  if(/JWT|not authenticated|Invalid API key/i.test(m))
+    return '로그인이 만료되었습니다. 새로고침 후 다시 로그인해주세요.';
+  if(/Failed to fetch|NetworkError/i.test(m))
+    return '네트워크 연결이 끊겼습니다. 잠시 후 다시 시도해주세요.';
+  return (ctx?ctx+': ':'')+m;   // 알 수 없는 오류는 원문 유지(제보용)
+}
 const TBL_ST={};
 function _tblVal(c,row){const h=String(c.f(row)).replace(/<[^>]*>/g,'').trim();const num=h.replace(/[,\s원%₩건개]/g,'');const n=(num!==''&&/^-?\d*\.?\d+$/.test(num))?+num:null;return{t:h,n};}
 function tbl(id,cols,rows,empty,after,onRow,opts){const prev=TBL_ST[id];TBL_ST[id]={cols,rows:rows||[],empty,after,onRow,opts:opts||{},sort:(prev&&prev._keep)?prev.sort:null,vflt:(prev&&prev._keep)?(prev.vflt||{}):{}};_tbl(id);}
@@ -1135,7 +1173,7 @@ async function saveLineAll(){const b=LN_BRAND;if(!b){toast('브랜드 선택','w
   // 1) 규칙 (라인명만 있으면 저장 · 키워드 선택)
   const rows=LN_RULES.filter(r=>r.line_name&&r.line_name.trim());
   await sb.from('hs_line_rule').delete().eq('brand_name',b);
-  if(rows.length){const {error}=await sb.from('hs_line_rule').insert(rows.map((r,idx)=>({brand_name:b,line_name:r.line_name.trim(),keyword:(r.keyword&&r.keyword.trim())?r.keyword.trim():null,sort_no:(idx+1)*10,active:r.active!==false,updated_by:$('who').textContent})));if(error){toast('규칙 저장 실패: '+error.message,'err');return;}}
+  if(rows.length){const {error}=await sb.from('hs_line_rule').insert(rows.map((r,idx)=>({brand_name:b,line_name:r.line_name.trim(),keyword:(r.keyword&&r.keyword.trim())?r.keyword.trim():null,sort_no:(idx+1)*10,active:r.active!==false,updated_by:$('who').textContent})));if(error){toast('규칙 저장 실패 — '+dbMsg(error),'err');return;}}
   // 2) 라인 색상
   const lines=[...new Set(rows.map(r=>r.line_name.trim()))];
   await sb.from('hs_line_color').delete().eq('brand_name',b);
@@ -1147,7 +1185,7 @@ async function saveLineAll(){const b=LN_BRAND;if(!b){toast('브랜드 선택','w
     if(fin&&fin!==LN_BRAND&&fin!==(r.rule_line||''))ups.push({set_code:r.set_code,line_name:fin,confirmed_by:$('who').textContent,confirmed_at:new Date().toISOString()});
     else dels.push(r.set_code);});
   if(dels.length)await sb.from('hs_line_assign').delete().in('set_code',dels);
-  if(ups.length){const {error}=await sb.from('hs_line_assign').upsert(ups,{onConflict:'set_code'});if(error){toast('배정 저장 실패: '+error.message,'err');return;}}
+  if(ups.length){const {error}=await sb.from('hs_line_assign').upsert(ups,{onConflict:'set_code'});if(error){toast('배정 저장 실패 — '+dbMsg(error),'err');return;}}
   toast(`저장 완료 · 규칙 ${rows.length} · 색상 ${colRows.length} · 배정 ${ups.length}`,'ok');
   PICKERS=false;await loadPickers();await loadLineData();}
 $('lnSaveRule')&&($('lnSaveRule').onclick=saveLineAll);
@@ -1683,7 +1721,7 @@ $('suSave')&&($('suSave').onclick=async()=>{
     toast(`${ym} ${BCH[ch]||''} 정산 ${payload.length}행 저장`,'ok');
     $('suMsg').innerHTML='<span style="color:#0f9d58">저장 완료 — 결산·검수에 반영됐습니다</span>';
     $('suPrev').innerHTML='';$('suFile').value='';$('suSetup').classList.add('hidden');SU.rows=[];
-  }catch(e){$('suMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(e.message||String(e))+'</span>';}
+  }catch(e){$('suMsg').innerHTML='<span style="color:var(--blocked)">저장 실패 — '+esc(dbMsg(e))+'</span>';}
   btn.disabled=false;btn.textContent='정산 원장에 저장';
 });
 // ===== PPL 프로그램 마스터 =====
@@ -1727,7 +1765,7 @@ function renderPplMaster(){
       const id=b.dataset.id,u=PPL_USE[id];
       if(u&&u.n){toast(`사용 중인 PPL입니다(${u.n}건) — 삭제 대신 「사용」 체크를 해제하세요`,'warn');return;}
       if(!confirm('이 PPL 프로그램을 삭제할까요?'))return;
-      if(!String(id).startsWith('new_')){const {error}=await sb.from('hs_ppl').delete().eq('id',id);if(error){toast('삭제 실패: '+error.message,'err');return;}}
+      if(!String(id).startsWith('new_')){const {error}=await sb.from('hs_ppl').delete().eq('id',id);if(error){toast('삭제 실패 — '+dbMsg(error),'err');return;}}
       PPLM=PPLM.filter(x=>x.id!==id);delete PPL_DIRTY[id];renderPplMaster();toast('삭제됨','ok');
     });
   },null,{filter:true});
@@ -1750,7 +1788,7 @@ $('pplSave')&&($('pplSave').onclick=async()=>{
   if(ins.length){const {error}=await sb.from('hs_ppl').insert(ins);err=err||error;}
   for(const u of ups){const {id,...rest}=u;const {error}=await sb.from('hs_ppl').update(rest).eq('id',id);err=err||error;}
   btn.disabled=false;btn.textContent='저장';
-  if(err){toast('저장 실패: '+err.message,'err');return;}
+  if(err){toast('저장 실패 — '+dbMsg(err),'err');return;}
   toast('PPL 저장됨 · 편성에서 선택할 수 있습니다','ok');
   await loadPplMaster();await loadPplOptions(true);
 });
@@ -1855,7 +1893,7 @@ async function auditSave(sign){
   const row={ym:r.ym,checks,memo:$('audMemo').value.trim(),status:sign?'done':'doing',updated_at:new Date().toISOString(),updated_by:who};
   if(sign){row.signed_by=who;row.signed_at=new Date().toISOString();row.snapshot={fp:r.fingerprint,rows:r.settle_rows,vat:r.vat_amt};}
   const {error}=await sb.from('hs_audit_month').upsert(row,{onConflict:'ym'});
-  if(error){$('audMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(error.message)+'</span>';return;}
+  if(error){$('audMsg').innerHTML='<span style="color:var(--blocked)">저장 실패 — '+esc(dbMsg(error))+'</span>';return;}
   toast(sign?`${r.ym} 검수 완료 확정`:'임시 저장됨','ok');
   if(sign)$('auditMask').style.display='none';
   loadAudit();
@@ -2204,12 +2242,12 @@ $('agE_save').onclick=async()=>{
   const rates=[];for(const l of rlines){const m=l.match(/^(.*?)[\s\t]+(-?\d+(?:\.\d+)?)%?$/);if(m)rates.push({channel:m[1].trim(),rate:parseFloat(m[2])/100});}
   let agId=AG_EDIT?AG_EDIT.id:null;
   if(AG_EDIT){await sb.from('hs_agency').update({name,brand_label,default_rate}).eq('id',agId);}
-  else{const {data,error}=await sb.from('hs_agency').insert({name,brand_label,default_rate,sort_no:(AG_LIST||[]).length+1}).select('id').single();if(error){toast('저장 실패: '+error.message,'blocked');return;}agId=data.id;}
+  else{const {data,error}=await sb.from('hs_agency').insert({name,brand_label,default_rate,sort_no:(AG_LIST||[]).length+1}).select('id').single();if(error){toast('저장 실패 — '+dbMsg(error),'blocked');return;}agId=data.id;}
   await sb.from('hs_agency_rate').delete().eq('agency_id',agId);
   if(rates.length)await sb.from('hs_agency_rate').insert(rates.map(r=>({agency_id:agId,channel:r.channel,rate:r.rate})));
   // 브랜드 매핑(요율 해석 소스 hs_agency_brand) 유지 — 이게 있어야 방송별 요율이 잡힘
   await sb.from('hs_agency_brand').delete().eq('agency_id',agId);
-  if(brandIds.length){const {error:me}=await sb.from('hs_agency_brand').insert(brandIds.map(bid=>({agency_id:agId,brand_id:bid})));if(me){toast('브랜드 매핑 저장 실패: '+me.message,'blocked');return;}}
+  if(brandIds.length){const {error:me}=await sb.from('hs_agency_brand').insert(brandIds.map(bid=>({agency_id:agId,brand_id:bid})));if(me){toast('브랜드 매핑 저장 실패 — '+dbMsg(me),'blocked');return;}}
   $('agEditMask').style.display='none';toast('저장됨 · 요율이 방송별 손익에 반영됩니다','ok');
   await agLoadData(true);agRenderMaster();
 };
@@ -2649,7 +2687,7 @@ $('hubSave')&&($('hubSave').onclick=async()=>{
     if(ins.length){const{error}=await sb.from('hs_product_cost').insert(ins);if(error)throw error;}
     for(const u of ups){const{id,...rest}=u;const{error}=await sb.from('hs_product_cost').update(rest).eq('id',id);if(error)throw error;}
     toast(`${ins.length+ups.length}건 저장 · 원가 갱신`,'ok');await loadHubData();
-  }catch(e){toast('저장 실패: '+e.message,'err');}
+  }catch(e){toast('저장 실패 — '+dbMsg(e),'err');}
   btn.disabled=false;btn.textContent='저장';});
 // 정산 별칭: 이 세트코드(표준명)로 들어오는 홈사 정산서 raw명 붙이기 (raw→표준명→세트코드→원가)
 function openHubAlias(sc){const row=HUB_ROWS.find(x=>x.set_code===sc);if(!row)return;HUB_SEL=row;HUB_ALIAS_DIRTY={};
@@ -2683,7 +2721,7 @@ $('hubAliasSave')&&($('hubAliasSave').onclick=async()=>{
     if(up.length){const{error}=await sb.from('hs_product_alias').upsert(up,{onConflict:'channel_id,raw_name'});if(error)throw error;}
     for(const d of del){const{error}=await sb.from('hs_product_alias').delete().eq('channel_id',d.channel_id).eq('raw_name',d.raw_name);if(error)throw error;}
     toast(`별칭 ${ents.length}건 저장 · 정산 매칭 갱신`,'ok');const sel=HUB_SEL?HUB_SEL.set_code:null;await loadHubData();if(sel)openHubAlias(sel);
-  }catch(e){toast('저장 실패: '+e.message,'err');}});
+  }catch(e){toast('저장 실패 — '+dbMsg(e),'err');}});
 
 // ===== MASTER: 홈쇼핑사 / 브랜드 / 상품구성 =====
 let CHS=[],BRS=[],PRS=[];
@@ -2789,7 +2827,7 @@ $('brFilter')&&$('brFilter').querySelectorAll('button').forEach(b=>b.onclick=()=
 $('brSave').onclick=async()=>{const rows=BRS.filter(r=>r.cogs_rate!=null||r.commission_rate!=null||r.agency_fee_rate!=null||r.md||r.memo||r.deal_type).map(r=>({brand_name:r.name,cogs_rate:r.cogs_rate,commission_rate:r.commission_rate,agency_fee_rate:r.agency_fee_rate,md:r.md||null,memo:r.memo||null,deal_type:r.deal_type||null,in_use:true,updated_by:$('who').textContent}));
   if(!rows.length){toast('저장할 설정이 없습니다','warn');return;}
   const {error}=await sb.from('hs_brand_cfg').upsert(rows,{onConflict:'brand_name'});
-  if(error){toast('저장 실패: '+error.message,'err');return;}
+  if(error){toast('저장 실패 — '+dbMsg(error),'err');return;}
   // 거래구분은 편성에도 반영 (브랜드 = 기준, 편성 = 건별 override 가능)
   let applied=0;
   for(const r of rows.filter(x=>x.deal_type)){
@@ -3049,7 +3087,7 @@ $('presetSave')&&($('presetSave').onclick=async()=>{
   const ins=rows.filter(r=>r.set_code||r.price!=null).map((r,idx)=>({brand_name:brand,line,channel_id:channel||null,preset_name:r.preset_name.trim(),set_code:r.set_code||null,price:r.price,tier_order:r.tier_order||((idx+1)*10),active:r.active!==false,updated_by:$('who').textContent}));
   let err=null;if(ins.length){const {error}=await sb.from('hs_set_preset').insert(ins);err=error;}
   btn.disabled=false;btn.textContent='구성 저장';
-  if(err){toast('저장 실패: '+err.message,'err');return;}
+  if(err){toast('저장 실패 — '+dbMsg(err),'err');return;}
   await loadPresets();loadPresetGrid();
   const sc=channel?`${BCH[channel]||''} 예외`:'기본';
   toast(`${ins.length}개 구성 저장 (${sc}) · 편성에 반영됨`,'ok');});
@@ -3337,7 +3375,7 @@ $('delBc').onclick=async()=>{if(!BC)return;
   await sb.from('hs_broadcast_tick').delete().eq('schedule_id',BC.id);
   await sb.from('hs_results').delete().eq('schedule_id',BC.id);
   const {error}=await sb.from('hs_schedules').delete().eq('id',BC.id);
-  if(error){toast('삭제 실패: '+error.message,'err');return;}toast('편성 삭제됨','ok');loadBcCal();};
+  if(error){toast('삭제 실패 — '+dbMsg(error),'err');return;}toast('편성 삭제됨','ok');loadBcCal();};
 async function openBc(id,push){if(push===undefined)push=true;
   const {data:s}=await sb.from('hs_schedules').select('*').eq('id',id).single();if(!s)return;BC=s;BC.__new=false;
   const {data:c}=await sb.from('hs_broadcast_comp').select('*').eq('schedule_id',id).order('seq');COMPS=c||[];
@@ -3615,7 +3653,7 @@ async function saveSchedule(silent){
   const wasNew=!!BC.__new;let err=null;
   if(wasNew){const st=(dealType==='대행')?'예정':'작성중';   // 자사는 구성 저장까지 마쳐야 '예정'으로 확정
     const {data,error}=await sb.from('hs_schedules').insert({...row,status:st,tenant_id:BC.tenant_id||null}).select().single();
-    if(error){toast('저장 실패: '+error.message,'err');return false;}BC=data;BC.__new=false;}
+    if(error){toast('저장 실패 — '+dbMsg(error),'err');return false;}BC=data;BC.__new=false;}
   else{const {error}=await sb.from('hs_schedules').update(row).eq('id',BC.id);err=error;}
   Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost});
   {const d2=new Date(airIso),e2=endIso?new Date(endIso):null;$('bcTitle').textContent=`${BCH[BC.channel_id]||''} ${BC.product_name||''}`;$('bcSub').textContent=`${d2.getFullYear()}.${d2.getMonth()+1}.${d2.getDate()}(${DOW[d2.getDay()]}) ${hhmm(d2)}${e2?'~'+hhmm(e2):''} · ${feeType==='정액'?('정액 '+baekman(BC.fee_amount)+'백만'):('정률 '+Math.round((BC.commission_rate||0)*100)+'%')}`;}
@@ -3922,13 +3960,13 @@ function wfRenderSide(){
 async function wfSetStep(k){if(!WF.cur)return;
   const wk=wfFlowKey(WF.cur);   // 타 콘솔 생성분은 workflow_key가 비어 있어 이때 확정 저장
   const {error}=await sb.from('co_channel').update({current_step:k,workflow_key:wk,updated_at:new Date().toISOString()}).eq('id',WF.cur.id);
-  if(error){toast('단계 변경 실패: '+error.message,'err');return;}
+  if(error){toast('단계 변경 실패 — '+dbMsg(error),'err');return;}
   WF.cur.current_step=k;WF.cur.workflow_key=wk;
   const t=WF.threads.find(x=>x.id===WF.cur.id);if(t){t.current_step=k;t.workflow_key=wk;}
   wfRenderDetail();wfRenderList();}
 async function wfMarkDone(id){
   const {error}=await sb.from('co_message').update({status:'done'}).eq('id',id);
-  if(error){toast('상태 변경 실패(작성자만 가능): '+error.message,'err');return;}
+  if(error){toast('상태 변경 실패 — '+dbMsg(error),'err');return;}
   const m=WF.msgs.find(x=>x.id===id);if(m)m.status='done';
   wfRenderDetail();wfLoadThreads();}
 async function wfSend(){
@@ -3940,7 +3978,7 @@ async function wfSend(){
   const btn=$('wfSend');btn.disabled=true;
   const {error}=await sb.from('co_message').insert(row);
   btn.disabled=false;
-  if(error){$('wfSendMsg').innerHTML='<span style="color:var(--blocked)">전송 실패: '+esc(error.message)+'</span>';return;}
+  if(error){$('wfSendMsg').innerHTML='<span style="color:var(--blocked)">전송 실패 — '+esc(dbMsg(error))+'</span>';return;}
   $('wfBody').value='';$('wfSendMsg').textContent='';
   await sb.from('co_channel').update({updated_at:new Date().toISOString()}).eq('id',t.id);
   await wfOpen(t.id);wfLoadThreads();
@@ -3985,7 +4023,7 @@ $('wfN_save')&&($('wfN_save').onclick=async()=>{
     const steps=wfSteps(wk);
     const {data,error}=await sb.from('co_channel').insert({tenant_id:WF_TENANT,kind:'object',name:`${brand} · ${party}`,
       obj_module:'brand',obj_type:'brand',obj_id:bid,party_id:pid,pair_key:pkey,workflow_key:wk,current_step:(steps[0]||{}).key||null,created_by:WF.uid}).select().single();
-    if(error){toast('스레드 생성 실패: '+error.message,'err');return;}
+    if(error){toast('스레드 생성 실패 — '+dbMsg(error),'err');return;}
     ch=data;
     try{await sb.from('co_channel_member').upsert({channel_id:ch.id,user_id:WF.uid,role:'owner'},{onConflict:'channel_id,user_id'});}catch(_){}
   }
@@ -4046,7 +4084,7 @@ async function submitSurvey(){
   const btn=$('svSubmit');btn.disabled=true;
   const {error}=await sb.from('hs_survey_response').upsert(row,{onConflict:'survey_key,user_id'});
   btn.disabled=false;
-  if(error){$('svMsg').innerHTML='<span style="color:var(--blocked)">저장 실패: '+esc(error.message)+'</span>';return;}
+  if(error){$('svMsg').innerHTML='<span style="color:var(--blocked)">저장 실패 — '+esc(dbMsg(error))+'</span>';return;}
   $('svMsg').innerHTML='<span style="color:#0f9d58">저장됨 · 감사합니다!</span>';toast('설문 응답 저장됨 · 감사합니다','ok');btn.textContent='응답 수정 저장';
 }
 async function loadSurveyResults(){
@@ -4141,7 +4179,7 @@ document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&$('shotMask').sty
 async function delReq(id,title,shot){
   if(!confirm(`이 개발요청을 삭제할까요?\n\n"${title}"\n\n되돌릴 수 없습니다.`))return;
   const {error}=await sb.from('req_dev_requests').delete().eq('id',id);
-  if(error){toast('삭제 실패: '+error.message,'err');return;}
+  if(error){toast('삭제 실패 — '+dbMsg(error),'err');return;}
   if(shot){try{await sb.storage.from('req-shots').remove([shot]);}catch(_){}}
   toast('요청이 삭제되었습니다','ok');loadDevReq();}
 async function changeReqStatus(id,s){const {error}=await sb.from('req_dev_requests').update({status:s,updated_at:new Date().toISOString()}).eq('id',id);

@@ -417,9 +417,12 @@ tbody tr:hover{background:var(--bg1)}
             <div class="row3"><div style="grid-column:1 / -1"><label><span style="color:#DC2626" title="저장 필수">●</span> 방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
             <div class="row3"><div><label>정산 구분</label><div class="seg" id="fFeeSeg"><button type="button" data-v="정액" class="on">정액</button><button type="button" data-v="정률">정률</button></div></div><div><div id="fFixedBox"><label>특약비(원)</label><input type="text" inputmode="numeric" id="fFixed"></div><div id="fRateBox" style="display:none"><label id="fRateLbl">홈사 수수료율(%)</label><input type="number" id="fRate"></div></div><div><label>거래 구분</label><div class="seg" id="fDealSeg"><button type="button" data-v="자사" class="on">자사</button><button type="button" data-v="대행">대행</button></div><span class="hint" id="dealHint" style="display:none;font-size:10.5px">대행: 수익 = 매출 × 대행수수료율</span></div></div>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 방송 시작 <span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
-            <div class="row3"><div><label>주문매출목표</label><input type="text" inputmode="numeric" id="fTarget"></div><div><label>순매출목표</label><input type="text" inputmode="numeric" id="fNet"></div><div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
+            <div class="row3"><div><label>주문매출목표</label><input type="text" inputmode="numeric" id="fTarget"></div>
+              <div><label>순매출목표 <span class="muted" style="font-weight:400;font-size:10.5px">주문매출 × 전환율 · 자동</span></label>
+                <input type="text" inputmode="numeric" id="fNet" readonly title="주문매출목표와 전환율로 자동 계산됩니다" style="background:var(--bg1);color:var(--ink2)"></div>
+              <div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
-            <div class="row3"><div><label>프로그램/차수</label><input id="fProg"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
+            <div class="row3"><div><label>차수 <span class="muted" style="font-weight:400;font-size:10.5px">브랜드·라인 기준 자동 · 수정 가능</span></label><input id="fProg" placeholder="예: 3차"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:13px"><div><label>쇼호스트</label><input id="fHost" placeholder="쇼호스트명"></div><div><label>PD</label><input id="fPd" placeholder="PD명"></div><div><label>담당 MD</label><input id="fMd" list="gsmd" placeholder="MD명"><datalist id="gsmd"><option>박민주 부장</option><option>장효석 이사</option><option>민정현 주임</option><option>한수진 과장</option><option>빅토리아 이사(외부)</option></datalist></div><div><label>색상</label><input type="color" id="fColor" value="#0D9488" style="width:48px;height:38px;padding:2px;border:1px solid var(--line1);border-radius:9px;cursor:pointer"></div></div>
             <label style="font-size:11.5px;color:var(--ink3);display:block;margin:4px 0 4px">사후미팅 메모</label>
             <textarea id="fPost" rows="2" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea>
@@ -961,9 +964,28 @@ const withComma=v=>v!=null&&v!==''?(+v).toLocaleString('ko-KR'):'';
 // 주문매출목표 ↔ 순매출목표 : 전환율로 상호 역산 (한쪽 입력 시 다른쪽 자동)
 let LINK_G=false;
 function convPct(){const c=parseFloat(String($('fConv').value).replace(/[^\d.]/g,''));return isFinite(c)&&c>0?c:null;}
-$('fTarget')&&$('fTarget').addEventListener('input',()=>{fmtComma($('fTarget'));if(LINK_G)return;const c=convPct();if(c){LINK_G=true;$('fNet').value=withComma(Math.round(num('fTarget')*c/100));LINK_G=false;}});
-$('fNet')&&$('fNet').addEventListener('input',()=>{fmtComma($('fNet'));if(LINK_G)return;const c=convPct();if(c){LINK_G=true;$('fTarget').value=withComma(Math.round(num('fNet')/(c/100)));LINK_G=false;}});
-$('fConv')&&$('fConv').addEventListener('input',()=>{const c=convPct();if(c&&num('fTarget')){LINK_G=true;$('fNet').value=withComma(Math.round(num('fTarget')*c/100));LINK_G=false;}});
+// ===== 차수 자동 입력 =====
+// 같은 브랜드·라인에서 이 방송보다 앞선 방송 수 + 1 = 이번 차수. 수동 수정도 가능(사람이 고치면 유지).
+let LAST_AUTOROUND='';
+async function autoRound(){
+  const el=$('fProg');if(!el||!BC)return;
+  const cur=(el.value||'').trim();
+  if(cur&&cur!==LAST_AUTOROUND)return;                       // 사람이 직접 적은 값은 건드리지 않음
+  const bid=$('fBrand')?$('fBrand').value:'',ln=$('fLineTop')?$('fLineTop').value:'';
+  if(!bid||!ln){el.value='';LAST_AUTOROUND='';return;}
+  const {startIso}=bcTimes();const air=startIso||new Date().toISOString();
+  let q=sb.from('hs_schedules').select('id',{count:'exact',head:true}).eq('brand_id',bid).eq('line',ln).lt('air_at',air);
+  const {count,error}=await q;
+  if(error)return;
+  const n=(count||0)+1, val=n+'차';
+  el.value=val;LAST_AUTOROUND=val;
+}
+// 순매출목표 = 주문매출목표 × 전환율 (자동 계산 · 직접 입력 불가)
+function syncNetTarget(){const c=convPct(),t=num('fTarget');
+  $('fNet').value=(c&&t)?withComma(Math.round(t*c/100)):'';
+  if(typeof updateSaveGate==='function')updateSaveGate();}
+$('fTarget')&&$('fTarget').addEventListener('input',()=>{fmtComma($('fTarget'));syncNetTarget();});
+$('fConv')&&$('fConv').addEventListener('input',syncNetTarget);
 $('fFixed')&&$('fFixed').addEventListener('input',()=>fmtComma($('fFixed')));
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let AUTHED=false;
@@ -2932,7 +2954,7 @@ $('fChannel')&&$('fChannel').addEventListener('change',()=>{applyChTag();if(type
 $('fBrand')&&$('fBrand').addEventListener('change',()=>{const b=BRAND_DEAL[$('fBrand').value];
   if(b&&b.deal&&!BC_LOCKED){setDealSeg(b.deal);toast(`${b.name} 기준 거래구분 '${b.deal}' 적용 (필요시 변경 가능)`,'ok');}
   applyBrandHint();
-  if(PICKERS){fillLineTop(false);applyAutoName();}});
+  if(PICKERS){fillLineTop(false);applyAutoName();autoRound();}});
 document.querySelectorAll('#fDealSeg button').forEach(b=>b.onclick=()=>setDealSeg(b.dataset.v));
 // 방송 날짜는 달력에서 고정, 시:분(time input)만 입력 → 전체 시각 조합
 function bcTimes(){const base=(BC&&BC.air_at)?new Date(BC.air_at):new Date();const y=base.getFullYear(),mo=base.getMonth(),d=base.getDate();
@@ -3135,7 +3157,8 @@ function bcAutoName(){const bn=pickBrandName();const ln=$('fLineTop')?$('fLineTo
   const lnDisp=ln?stripLine(ln,bn):'';return [bn,lnDisp].filter(Boolean).join(' ');}
 function applyAutoName(){const nm=bcAutoName();if(!nm)return;const el=$('fProduct');if(!el)return;
   const cur=el.value.trim();if(cur===''||cur===LAST_AUTONAME)el.value=nm;LAST_AUTONAME=nm;}
-$('fLineTop')&&($('fLineTop').onchange=()=>{fillSkuPicker();updateCompBL();applyAutoName();});
+$('fLineTop')&&($('fLineTop').onchange=()=>{fillSkuPicker();updateCompBL();applyAutoName();autoRound();});
+$('fAir')&&$('fAir').addEventListener('change',()=>autoRound());
 $('fSku').onchange=()=>{const id=$('fSku').value;if(!id||!BC)return;const p=PRESETS.find(x=>x.id===id);if(!p)return;
   const nm0=`${pickBrandName()} ${p.preset_name}`;
   // 세트코드 없는 구성(대행 등)은 이름으로 중복 판정
@@ -3401,6 +3424,8 @@ async function showBcForm(push){const s=BC;
   $('fAgency').value=s.agency_fee_rate?Math.round(s.agency_fee_rate*1000)/10:'';   // setDealSeg보다 먼저 채워야 기준값이 덮어쓰지 않음
   setFeeSeg(s.fee_type||'정액');setDealSeg(s.deal_type||'자사');$('fFixed').value=withComma(s.fee_amount);$('fRate').value=s.commission_rate?Math.round(s.commission_rate*100):'';
   $('fTarget').value=withComma(s.target_sales);$('fNet').value=withComma(s.net_target);$('fConv').value=s.conv_rate?Math.round(s.conv_rate*100):'';$('fTax').value=s.tax_type||'면세';$('fProg').value=s.program_name||'';
+  LAST_AUTOROUND=s.program_name||'';   // 저장된 차수는 유지, 비어 있으면 자동 채움 대상
+  if(!s.program_name)setTimeout(()=>autoRound(),300);
   {const hasPpl=!!(s.ppl_note||s.ppl_cost||s.ppl_id);
    $('fPpl').value=s.ppl_note||'';
    $('fPplCost').value=s.ppl_cost!=null?Number(s.ppl_cost).toLocaleString('ko-KR'):'';

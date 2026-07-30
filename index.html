@@ -2920,7 +2920,8 @@ function toLocalInput(iso){if(!iso)return '';const d=new Date(iso),p=n=>String(n
 function fromLocalInput(v){return v?v+':00+09:00':null;}
 function setFeeSeg(v){document.querySelectorAll('#fFeeSeg button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));$('fFixedBox').style.display=v==='정률'?'none':'';$('fRateBox').style.display=v==='정률'?'':'none';
   const fb=$('fBack'),wrap=fb&&fb.closest('div');if(fb){fb.disabled=(v==='정률');if(wrap)wrap.style.opacity=(v==='정률')?.4:1;}
-  if(getDealSeg()==='대행'){$('fRateBox').style.display='';$('fFixedBox').style.display='none';}
+  // 대행도 정액 방송이면 특약비(정액비)를 입력한다. 대행은 홈사수수료율도 함께 받으므로 정률칸을 항상 노출.
+  if(getDealSeg()==='대행'){$('fRateBox').style.display='';$('fFixedBox').style.display=(v==='정률')?'none':'';}
   if(typeof updateSaveGate==='function')updateSaveGate();}
 function getFeeSeg(){const b=document.querySelector('#fFeeSeg button.on');return b?b.dataset.v:'정액';}
 function setDealSeg(v){v=v||'자사';document.querySelectorAll('#fDealSeg button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));$('dealHint').style.display=(v==='대행')?'block':'none';
@@ -2929,7 +2930,7 @@ function setDealSeg(v){v=v||'자사';document.querySelectorAll('#fDealSeg button
   // ※ fRate(수수료율)는 홈쇼핑사가 떼가는 판매수수료(12~49%)로 대행수수료(3~7%)와 다른 값이다.
   {const cb=$('fCostBox');if(cb)cb.style.display=agy?'none':'';}
   {const ab=$('fAgencyBox');if(ab)ab.style.display=agy?'':'none';}
-  if(agy){$('fRateBox').style.display='';$('fFixedBox').style.display='none';applyAgencyFee();}
+  if(agy){$('fRateBox').style.display='';$('fFixedBox').style.display=(getFeeSeg()==='정률')?'none':'';applyAgencyFee();}
   else{setFeeSeg(getFeeSeg());}
   if(BC)applyDraftGate();   // 대행이면 구성 입력 접기 / 자사면 열기
   if(typeof updateSaveGate==='function')updateSaveGate();
@@ -3634,7 +3635,7 @@ async function clRender(){const id=CL_ID;if(!id)return;await ensureChannels();
     const rpm=rate[i],rpmTxt=rpm==null?'<span style="color:#bbb">–</span>':(rpm>0?'+'+won(rpm):(rpm<0?won(rpm):'0'));
     return `<tr><td>${new Date(t.tick_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</td><td style="text-align:center;font-weight:700">${t.calls??''}</td>${qc}<td style="text-align:right;font-weight:700;color:#0D9488">${rpmTxt}</td><td style="text-align:right;font-weight:700">${won(cums[i])}</td><td>${esc(t.memo||'')}</td></tr>`;}).join('')||`<tr><td colspan="${4+cps.length}" style="text-align:center;padding:24px;color:#888">아직 입력된 콜이 없습니다</td></tr>`;
   v.innerHTML=`<div style="max-width:940px;margin:0 auto">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:18px">📞 실시간 콜 현황</b><span style="color:#888;font-size:12px">${nowT} 기준 · 15초 자동 새로고침 · 조회 전용</span><div style="flex:1"></div><a href="#home" onclick="location.reload()" style="font-size:12px;color:#0f766e;text-decoration:none">콘솔로 →</a></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:18px">📞 실시간 콜 현황</b><span style="color:#888;font-size:12px">${nowT} 기준 · 15초 자동 새로고침 · 조회 전용</span><div style="flex:1"></div><a href="#home" onclick="event.preventDefault();location.replace(location.pathname+'#home');location.reload();return false" style="font-size:12px;color:#0f766e;text-decoration:none">콘솔로 →</a></div>
     <div style="font-size:16px;font-weight:800">${esc(BCH[s.channel_id]||'')} · ${esc(s.product_name||'')}</div>
     <div style="color:#888;font-size:12.5px;margin-bottom:12px">${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${hhmm(d)}${e?'~'+hhmm(e):''}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">${[['누적 매출',won(lastSales)],['누적 판매수량',won(totQty)+'개'],['목표',won(tgt)],['달성률',(tgt?Math.round(lastSales/tgt*100):0)+'%'],['최종 콜',last&&last.calls!=null?last.calls:'–']].map(k=>`<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 16px;min-width:110px"><div style="font-size:11px;color:#888">${k[0]}</div><div style="font-size:18px;font-weight:800">${k[1]}</div></div>`).join('')}</div>
@@ -3680,7 +3681,7 @@ async function saveSchedule(silent){
     const {data,error}=await sb.from('hs_schedules').insert({...row,status:st,tenant_id:BC.tenant_id||null}).select().single();
     if(error){toast('저장 실패 — '+dbMsg(error),'err');return false;}BC=data;BC.__new=false;}
   else{const {error}=await sb.from('hs_schedules').update(row).eq('id',BC.id);err=error;}
-  Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost});
+  Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_id:row.ppl_id,cost_rate:row.cost_rate,backmargin_rate:row.backmargin_rate,agency_fee_rate:row.agency_fee_rate,program_name:row.program_name,show_host:row.show_host,pd:row.pd,md:row.md,color:row.color});
   {const d2=new Date(airIso),e2=endIso?new Date(endIso):null;$('bcTitle').textContent=`${BCH[BC.channel_id]||''} ${BC.product_name||''}`;$('bcSub').textContent=`${d2.getFullYear()}.${d2.getMonth()+1}.${d2.getDate()}(${DOW[d2.getDay()]}) ${hhmm(d2)}${e2?'~'+hhmm(e2):''} · ${feeType==='정액'?('정액 '+baekman(BC.fee_amount)+'백만'):('정률 '+Math.round((BC.commission_rate||0)*100)+'%')}`;}
   applyLock();applyDraftGate();
   if(wasNew){try{history.replaceState({v:'bcdetail',id:BC.id},'');}catch(_){}}

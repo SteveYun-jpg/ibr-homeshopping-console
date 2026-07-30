@@ -162,6 +162,7 @@ body.collapsed .sideuser{justify-content:center;padding:11px 0 4px}
 main{padding:22px 30px 36px;width:100%}
 /* 워크플로우는 글로벌소싱 콘솔처럼 화면을 꽉 채운다 — main 여백 상쇄 + 뷰포트 높이 */
 main:has(> #v-workflow.active),body.wf-full main{padding:0;height:100vh;display:flex;flex-direction:column}
+body.wf-full #qBanner,main:has(> #v-workflow.active) #qBanner,main:has(> #v-quest.active) #qBanner{display:none!important}
 #v-workflow.active{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 18px 16px;box-sizing:border-box}
 .view{display:none}.view.active{display:block}
 .sechead{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
@@ -311,7 +312,8 @@ tbody tr:hover{background:var(--bg1)}
       <div class="nav" data-v="sim" data-t="방송 시뮬레이션"><span class="lb">시뮬레이션</span></div>
     </div>
     <div class="navgroup">
-      <div class="gl">의견</div>
+      <div class="gl">업무</div>
+      <div class="nav" data-v="quest" data-t="업무 지시"><span class="lb">✅ 업무 지시</span><span id="qNavBadge" style="display:none;background:#E11D48;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:6px"></span></div>
       <div class="nav" data-v="survey" data-t="의견 설문"><span class="lb">📝 의견 설문</span></div>
     </div>
     <div class="navgroup" id="memberNav" style="display:none">
@@ -339,6 +341,12 @@ tbody tr:hover{background:var(--bg1)}
   </aside>
   <div class="content">
     <main>
+      <!-- 업무 지시 알림 배너 -->
+      <div id="qBanner" style="display:none;align-items:center;gap:10px;background:#FFF8E6;border:1px solid #F5D98B;border-radius:11px;padding:10px 14px;margin-bottom:14px;font-size:12.5px">
+        <span style="font-size:15px">🔔</span><span id="qBannerTxt" style="flex:1"></span>
+        <button class="btn primary sm" onclick="navTo('quest')">확인하기</button>
+        <button class="btn sm" onclick="document.getElementById('qBanner').style.display='none'">닫기</button>
+      </div>
       <!-- 대시보드 -->
       <div class="view active" id="v-home">
         <div class="sechead"><h2 class="sec">결산 대시보드</h2><span class="tag" id="homeAsof">–</span>
@@ -569,6 +577,18 @@ tbody tr:hover{background:var(--bg1)}
       <!-- 워크플로우 · 거래처 업무 협업 — 공유 모듈(shared/workflow.js)이 렌더합니다 (홈쇼핑·글로벌소싱 공용) -->
       <div class="view" id="v-workflow"></div>
 
+
+      <!-- 업무 지시 (지시 → 보고 → 확인) -->
+      <div class="view" id="v-quest">
+        <div class="sechead"><h2 class="sec">업무 지시</h2><span class="tag" id="qRoleTag">내 할 일</span>
+          <div class="spacer"></div>
+          <button class="btn primary sm" id="qNewBtn" style="display:none">+ 새 지시</button>
+        </div>
+        <p class="hint" id="qHint"></p>
+        <div class="scroll" id="qSummary" style="margin-bottom:12px"></div>
+        <div class="toolbar seg" id="qTabs" style="max-width:520px;margin:0 0 10px"></div>
+        <div class="card scroll" style="padding:0"><table id="t_quest"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+      </div>
 
       <!-- PPL 프로그램 마스터 -->
       <div class="view" id="v-ppl">
@@ -821,6 +841,31 @@ tbody tr:hover{background:var(--bg1)}
       <div class="spacer"></div>
       <button class="btn primary" id="noticeClose">확인</button>
     </div>
+  </div>
+</div>
+<div class="mask" id="qNewMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:57;padding:20px">
+  <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:520px;width:100%;max-height:92vh;overflow:auto">
+    <div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:16px">새 지시</b><div class="spacer"></div><button class="btn sm" id="qNewClose">닫기</button></div>
+    <label style="font-size:12px;color:var(--ink3)">담당자 <span style="opacity:.6">(여러 명 선택 시 각각 지시가 생성됩니다 · Ctrl로 복수)</span></label>
+    <select id="qN_assignee" multiple size="6" style="width:100%;margin:2px 0 10px;height:auto;padding:6px;border:1px solid var(--line1);border-radius:9px;font-family:inherit;font-size:12.5px"></select>
+    <label style="font-size:12px;color:var(--ink3)">제목</label><input id="qN_title" class="hsearch" style="width:100%;margin:2px 0 10px" placeholder="예: 2026-06 정산 검수">
+    <label style="font-size:12px;color:var(--ink3)">내용·요청사항</label>
+    <textarea id="qN_body" class="hsearch" style="width:100%;box-sizing:border-box;min-height:80px;margin:2px 0 10px" placeholder="무엇을 어디서 어떻게 하면 되는지 적어주세요"></textarea>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label style="font-size:12px;color:var(--ink3)">기한</label><input type="date" id="qN_due" class="hsearch" style="width:100%;margin:2px 0 10px"></div>
+      <div style="flex:1"><label style="font-size:12px;color:var(--ink3)">우선순위</label>
+        <select id="qN_prio" style="width:100%;margin:2px 0 10px"><option value="normal">보통</option><option value="high">높음</option><option value="urgent">긴급</option><option value="low">낮음</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center"><button class="btn primary" id="qN_save">지시 보내기</button>
+      <button class="btn sm" id="qN_copy" title="카톡 단톡에 붙일 문구 복사">📋 카톡 문구 복사</button>
+      <span class="muted" id="qN_msg" style="font-size:11.5px"></span></div>
+  </div>
+</div>
+<div class="mask" id="qDetMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:57;padding:20px">
+  <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:560px;width:100%;max-height:92vh;overflow:auto">
+    <div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:16px" id="qD_title">지시</b><div class="spacer"></div><button class="btn sm" id="qD_close">닫기</button></div>
+    <div id="qD_body"></div>
+    <div id="qD_foot" style="display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--line1);flex-wrap:wrap"></div>
   </div>
 </div>
 <div class="mask" id="auditMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:56;padding:20px">
@@ -1125,7 +1170,7 @@ function navTo(v,push){if(push===undefined)push=true;
   const navEl=document.querySelector('.nav[data-v="'+v+'"]')||document.querySelector('.rb[data-v="'+v+'"]');if(navEl)navEl.classList.add('active');
   const view=$('v-'+v);if(view)view.classList.add('active');
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
-  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();
+  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   document.body.classList.toggle('wf-full',v==='workflow');   // 워크플로우는 여백 없이 꽉 채움
   if(window.innerWidth<760)document.body.classList.add('collapsed');
@@ -1290,6 +1335,25 @@ function applyMemberGate(){
   const mb=$('memberNav');if(mb)mb.style.display=isAdmin()?'':'none';
   // 워크플로우: 준비 중이라 대표 계정에서만 노출 (팀원 혼선 방지)
   const wn=$('wfNav');if(wn)wn.style.display=wfAllowed()?'':'none';
+  if(AUTHED&&ok)questPing();
+}
+// 로그인 시 업무 지시 알림 (배지 + 배너)
+async function questPing(){
+  if(!ME||!ME.user_id)return;
+  const boss=qIsBoss();
+  let q=sb.from('co_work_request').select('id,title,status,due_at,assignee_id').in('status',boss?['open','doing','reported']:['open','doing']);
+  if(!boss)q=q.eq('assignee_id',ME.user_id);
+  const {data,error}=await q;if(error)return;
+  const rows=data||[];
+  const wait=rows.filter(r=>r.status==='reported').length;
+  const mine=rows.filter(r=>r.assignee_id===ME.user_id&&['open','doing'].includes(r.status));
+  const over=mine.filter(r=>r.due_at&&new Date(r.due_at)<new Date()).length;
+  const n=boss?wait:mine.length;
+  const b=$('qNavBadge');if(b){b.style.display=n?'':'none';b.textContent=n;}
+  const bn=$('qBanner');if(!bn)return;
+  if(boss&&wait){$('qBannerTxt').innerHTML=`팀원이 완료 보고한 업무 <b>${wait}건</b>이 확인을 기다리고 있습니다.`;bn.style.display='flex';}
+  else if(!boss&&mine.length){$('qBannerTxt').innerHTML=`나에게 지시된 업무 <b>${mine.length}건</b>이 있습니다.${over?` (기한 초과 <b style="color:#B91C1C">${over}건</b>)`:''} 끝내면 완료 보고를 눌러주세요.`;bn.style.display='flex';}
+  else bn.style.display='none';
 }
 // 워크플로우 접근 허용 계정
 function wfAllowed(){return !!(ME&&(ME.email==='dbswlghd@gmail.com'||ME.user_id==='11111111-0000-0000-0000-000000000001'));}
@@ -1572,6 +1636,120 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
 
+// ===== 업무 지시 (지시 → 보고 → 확인) · co_work_request 기반 =====
+const Q_STATUS={open:['지시','#F59E0B','#FEF3C7'],doing:['진행중','#3B82F6','#E0F2FE'],reported:['보고 완료 · 확인대기','#0D9488','#D6F5EC'],done:['확인 완료','#10B981','#D1FAE5'],canceled:['취소','#94A3B8','var(--bg2)']};
+const Q_PRIO={urgent:['긴급','#DC2626'],high:['높음','#B45309'],normal:['보통','var(--ink3)'],low:['낮음','var(--ink4)']};
+let Q={rows:[],members:[],tab:'todo',cur:null};
+function qIsBoss(){return !!(ME&&(ME.is_admin||ME.grade==='임원'||ME.grade==='경영진'));}
+function qBadge(s){const v=Q_STATUS[s]||Q_STATUS.open;return `<span class="chip" style="background:${v[2]};color:${v[1]}">${v[0]}</span>`;}
+function qOverdue(r){return r.due_at&&['open','doing'].includes(r.status)&&new Date(r.due_at)<new Date(new Date().toDateString());}
+async function loadQuest(){
+  if(!AUTHED)return;
+  const boss=qIsBoss();
+  $('qNewBtn').style.display=boss?'':'none';
+  $('qRoleTag').textContent=boss?'지시 · 보고 관리':'내 할 일';
+  $('qHint').innerHTML=boss
+    ? '팀원에게 <b>지시</b>를 보내면 그 사람 화면 「업무 지시」에 뜹니다. 팀원이 <b>완료 보고</b>하면 여기 <b>확인대기</b>로 올라오고, 확인하면 종료됩니다. 기한이 지난 건은 빨갛게 표시됩니다.'
+    : '나에게 온 지시입니다. 다 하면 <b>완료 보고</b>를 눌러 무엇을 했는지 한 줄 남겨주세요. 대표 확인 후 종료됩니다.';
+  if(!Q.members.length){const {data}=await sb.from('hs_member').select('user_id,name,team,grade').order('name');Q.members=data||[];}
+  const {data,error}=await sb.from('co_work_request').select('*').order('created_at',{ascending:false});
+  if(error){$('qSummary').innerHTML='<div class="state" style="padding:16px;color:var(--blocked)">조회 실패 — '+esc(dbMsg(error))+'</div>';return;}
+  Q.rows=(data||[]).filter(r=>(r.module||'hs')==='hs');
+  const mine=Q.rows.filter(r=>r.assignee_id===(ME&&ME.user_id));
+  const openMine=mine.filter(r=>['open','doing'].includes(r.status)).length;
+  const wait=Q.rows.filter(r=>r.status==='reported').length;
+  const over=Q.rows.filter(qOverdue).length;
+  const b=$('qNavBadge');if(b){const n=boss?wait:openMine;b.style.display=n?'':'none';b.textContent=n;}
+  $('qSummary').innerHTML='<div class="kpis" style="margin:0">'
+    +(boss?`<div class="kpi brand"><div class="l">확인 대기</div><div class="v">${wait}건</div><div class="s">팀원이 완료 보고한 건</div></div>`
+           :`<div class="kpi brand"><div class="l">내 할 일</div><div class="v">${openMine}건</div><div class="s">완료 보고하면 대표 확인으로 넘어갑니다</div></div>`)
+    +`<div class="kpi ${over?'warn':''}"><div class="l">기한 초과</div><div class="v">${over}건</div></div>`
+    +`<div class="kpi"><div class="l">전체 진행중</div><div class="v">${Q.rows.filter(r=>['open','doing','reported'].includes(r.status)).length}건</div></div>`
+    +'</div>';
+  const tabs=boss?[['wait','확인대기'],['open','진행중'],['mine','내 할 일'],['all','전체']]:[['todo','내 할 일'],['reported','보고한 건'],['done','완료']];
+  if(!tabs.some(t=>t[0]===Q.tab))Q.tab=tabs[0][0];
+  $('qTabs').innerHTML=tabs.map(t=>`<button class="${t[0]===Q.tab?'on':''}" data-v="${t[0]}">${t[1]}</button>`).join('');
+  $('qTabs').querySelectorAll('button').forEach(x=>x.onclick=()=>{Q.tab=x.dataset.v;loadQuest();});
+  renderQuest();
+}
+function renderQuest(){
+  const me=ME&&ME.user_id,boss=qIsBoss();
+  let rows=Q.rows;
+  if(Q.tab==='wait')rows=rows.filter(r=>r.status==='reported');
+  else if(Q.tab==='open')rows=rows.filter(r=>['open','doing'].includes(r.status));
+  else if(Q.tab==='mine'||Q.tab==='todo')rows=rows.filter(r=>r.assignee_id===me&&(Q.tab==='todo'?['open','doing'].includes(r.status):true));
+  else if(Q.tab==='reported')rows=rows.filter(r=>r.assignee_id===me&&r.status==='reported');
+  else if(Q.tab==='done')rows=rows.filter(r=>r.assignee_id===me&&r.status==='done');
+  const nameOf=id=>(Q.members.find(m=>m.user_id===id)||{}).name||'-';
+  tbl('t_quest',[
+    {h:'상태',l:1,f:r=>qBadge(r.status)+(qOverdue(r)?' <span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':'')},
+    {h:'제목',l:1,f:r=>`<b>${esc(r.title||'')}</b>${r.body?`<div class="muted" style="font-size:10.5px;margin-top:2px">${esc(String(r.body).slice(0,46))}${String(r.body).length>46?'…':''}</div>`:''}`},
+    {h:'담당자',l:1,f:r=>esc(nameOf(r.assignee_id))},
+    {h:'우선',l:1,f:r=>{const p=Q_PRIO[r.priority]||Q_PRIO.normal;return `<span style="color:${p[1]};font-weight:700">${p[0]}</span>`;}},
+    {h:'기한',l:1,f:r=>r.due_at?String(r.due_at).slice(0,10):'<span class="muted">–</span>'},
+    {h:'지시일',l:1,f:r=>String(r.created_at||'').slice(5,10)},
+    {h:'보고',l:1,f:r=>r.reported_at?String(r.reported_at).slice(5,10):'<span class="muted">–</span>'}
+  ],rows,boss?'해당 지시가 없습니다':'받은 지시가 없습니다',null,r=>questOpen(r.id),{filter:true});
+}
+function questOpen(id){
+  const r=Q.rows.find(x=>x.id===id);if(!r)return;Q.cur=r;
+  const boss=qIsBoss(),me=ME&&ME.user_id,mine=r.assignee_id===me;
+  const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
+  $('qD_title').textContent=r.title||'지시';
+  $('qD_body').innerHTML=`
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">${qBadge(r.status)}
+      <span class="muted" style="font-size:11.5px">담당 ${esc(nameOf(r.assignee_id))} · 지시 ${esc(String(r.created_at||'').slice(0,10))}${r.due_at?' · 기한 '+esc(String(r.due_at).slice(0,10)):''}</span>
+      ${qOverdue(r)?'<span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':''}</div>
+    <div style="background:var(--bg1);border-radius:10px;padding:11px 13px;font-size:12.5px;white-space:pre-wrap;line-height:1.55">${esc(r.body||'(내용 없음)')}</div>
+    ${r.report_body?`<div style="margin-top:10px"><div class="muted" style="font-size:11px;font-weight:700">완료 보고 · ${esc(String(r.reported_at||'').slice(0,16).replace('T',' '))}</div>
+      <div style="border:1px solid #CFE9E5;background:#FBFEFD;border-radius:10px;padding:11px 13px;font-size:12.5px;white-space:pre-wrap;margin-top:4px">${esc(r.report_body)}</div></div>`:''}
+    ${r.reject_reason?`<div style="margin-top:8px;color:var(--blocked);font-size:11.5px">반려 사유: ${esc(r.reject_reason)}</div>`:''}
+    ${(mine&&['open','doing'].includes(r.status))?`<div style="margin-top:10px"><label class="muted" style="font-size:11px">완료 보고 내용</label>
+      <textarea id="qD_report" class="hsearch" style="width:100%;box-sizing:border-box;min-height:70px" placeholder="예: 2026-06 검수 완료 — 정산 미도착 7건은 홈사 확인 후 8월 반영 예정으로 사유 기재"></textarea></div>`:''}`;
+  let btns='';
+  if(mine&&['open','doing'].includes(r.status))btns+='<button class="btn primary sm" id="qD_send">완료 보고</button>';
+  if(boss&&r.status==='reported')btns+='<button class="btn primary sm" id="qD_ok">확인 완료</button><button class="btn sm" id="qD_back" style="color:var(--blocked)">반려(재작업)</button>';
+  if(boss&&['open','doing'].includes(r.status))btns+='<button class="btn sm" id="qD_cancel" style="color:var(--blocked)">지시 취소</button>';
+  btns+='<div class="spacer"></div><span class="muted" id="qD_msg" style="font-size:11.5px"></span>';
+  $('qD_foot').innerHTML=btns;
+  $('qDetMask').style.display='flex';
+  const upd=async(patch,msg)=>{
+    const {error}=await sb.from('co_work_request').update({...patch,updated_at:new Date().toISOString()}).eq('id',r.id);
+    if(error){$('qD_msg').innerHTML='<span style="color:var(--blocked)">'+esc(dbMsg(error))+'</span>';return;}
+    toast(msg,'ok');$('qDetMask').style.display='none';loadQuest();};
+  $('qD_send')&&($('qD_send').onclick=()=>{const t=($('qD_report').value||'').trim();
+    if(!t){$('qD_msg').innerHTML='<span style="color:var(--gold)">무엇을 했는지 한 줄 남겨주세요</span>';return;}
+    upd({status:'reported',report_body:t,reported_at:new Date().toISOString(),reported_by:me},'완료 보고 전송 — 대표 확인 대기');});
+  $('qD_ok')&&($('qD_ok').onclick=()=>upd({status:'done',confirmed_at:new Date().toISOString(),confirmed_by:me},'확인 완료'));
+  $('qD_back')&&($('qD_back').onclick=()=>{const why=prompt('반려 사유를 적어주세요 (담당자에게 표시됩니다)');if(why==null)return;
+    upd({status:'doing',reject_reason:why||'재작업 요청',reported_at:null},'반려 — 담당자에게 재작업 요청');});
+  $('qD_cancel')&&($('qD_cancel').onclick=()=>{if(!confirm('이 지시를 취소할까요?'))return;upd({status:'canceled'},'지시 취소');});
+}
+$('qD_close')&&($('qD_close').onclick=()=>$('qDetMask').style.display='none');
+$('qNewBtn')&&($('qNewBtn').onclick=async()=>{
+  if(!Q.members.length){const {data}=await sb.from('hs_member').select('user_id,name,team,grade').order('name');Q.members=data||[];}
+  $('qN_assignee').innerHTML=Q.members.filter(m=>m.user_id).map(m=>`<option value="${m.user_id}">${esc(m.name||'')}${m.grade?' · '+esc(m.grade):''}</option>`).join('');
+  $('qN_title').value='';$('qN_body').value='';$('qN_due').value='';$('qN_prio').value='normal';$('qN_msg').textContent='';
+  $('qNewMask').style.display='flex';});
+$('qNewClose')&&($('qNewClose').onclick=()=>$('qNewMask').style.display='none');
+function qKakaoText(){
+  const t=$('qN_title').value.trim(),b=$('qN_body').value.trim(),d=$('qN_due').value;
+  const who=[...$('qN_assignee').selectedOptions].map(o=>o.textContent.split(' · ')[0]).join(', ');
+  return `[업무 지시] ${t}\n담당: ${who}${d?`\n기한: ${d}`:''}\n\n${b}\n\n콘솔 → 왼쪽 메뉴 「✅ 업무 지시」에서 확인하고, 끝나면 완료 보고 눌러주세요.\nhttps://ibr-homeshopping-console.netlify.app/#quest`;}
+$('qN_copy')&&($('qN_copy').onclick=async()=>{try{await navigator.clipboard.writeText(qKakaoText());toast('카톡 문구 복사됨','ok');}catch(_){prompt('복사',qKakaoText());}});
+$('qN_save')&&($('qN_save').onclick=async()=>{
+  const ids=[...$('qN_assignee').selectedOptions].map(o=>o.value);
+  const title=$('qN_title').value.trim(),body=$('qN_body').value.trim();
+  if(!ids.length){$('qN_msg').innerHTML='<span style="color:var(--blocked)">담당자를 선택하세요</span>';return;}
+  if(!title){$('qN_msg').innerHTML='<span style="color:var(--blocked)">제목을 입력하세요</span>';return;}
+  const btn=$('qN_save');btn.disabled=true;
+  const rows=ids.map(uid=>({tenant_id:WF_TENANT,module:'hs',title,body:body||null,from_team:'homeshopping',to_team:'homeshopping',
+    assignee_id:uid,status:'open',priority:$('qN_prio').value,due_at:$('qN_due').value?new Date($('qN_due').value+'T23:59:59').toISOString():null,
+    created_by:ME&&ME.user_id}));
+  const {error}=await sb.from('co_work_request').insert(rows);
+  btn.disabled=false;
+  if(error){$('qN_msg').innerHTML='<span style="color:var(--blocked)">'+esc(dbMsg(error))+'</span>';return;}
+  toast(`${rows.length}명에게 지시 전송`,'ok');$('qNewMask').style.display='none';loadQuest();});
 // ===== 자사 정산서 업로드 · 자동파싱 =====
 const SU_FIELDS=[
   ['product_name','품목명',true,[/품목/,/상품명/,/제품/,/판매품목/,/구성/]],

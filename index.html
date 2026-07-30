@@ -658,7 +658,10 @@ tbody tr:hover{background:var(--bg1)}
         <div class="seg" id="chTabs" style="max-width:320px;margin:0 0 12px"><button class="on" data-v="base">홈쇼핑사 기본정보</button><button data-v="fee">정액비DB</button></div>
 
         <div id="chPaneBase">
-          <p class="hint">홈사별 <b>매출인식방법</b>·기본 수수료·결제조건을 관리합니다. <b style="color:#0f9d58">총액법</b>=정산금액 전체가 매출 · <b style="color:#7C3AED">순액법</b>=정산금액이 우리 수수료라 <b>수수료율로 역산</b>해 Sell Out을 구합니다. 영업기준 정산이 이 값에 따라 갈립니다.</p>
+          <p class="hint">홈사별 <b>매출인식방법</b>·<b>거래유형</b>·기본 수수료·결제조건을 관리합니다. 전 홈사 공통 기준은 <b>영업기준 = 소비자 판매가</b>, <b>회계마감기준 = 소비자 판매가 − 수수료</b>입니다.<br>
+            <b style="color:#0f9d58">총액법</b> = 정산서 금액이 <b>우리가 받는 금액</b>(위수탁 수수료 차감 후 / 직매입 공급가) → 회계마감은 그 금액 그대로.
+            <b style="color:#7C3AED">순액법</b> = 정산서 금액이 <b>홈사 수수료</b> → 회계마감 = 소비자판매가 − 그 수수료.
+            <b>거래유형</b>은 NS처럼 직매입·위수탁이 함께 돌아가는 홈사를 위해 <b>행 단위</b>로도 저장되며, 여기 값은 기본값입니다.</p>
           <div class="toolbar"><span class="muted">셀을 수정한 뒤 저장하세요.</span><div class="spacer"></div><button class="btn primary sm" id="chSave">저장</button></div>
           <div class="card scroll" style="padding:0"><table id="t_channels"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
         </div>
@@ -1757,14 +1760,15 @@ const SU_FIELDS=[
   ['qty','수량',false,[/수량/,/판매수량/,/건수/]],
   ['supply_amount','공급가액',false,[/공급가/,/공급대가/]],
   ['vat_amount','부가세신고금액',false,[/부가세신고/,/신고금액/,/^부가세$/,/세액/]],
-  ['sellout_amount','SellOut(고객판매액)',false,[/sellout/i,/셀아웃/,/고객판매/]],
+  ['sellout_amount','소비자판매가(SellOut)',false,[/소비자판매/,/고객판매/,/sellout/i,/셀아웃/,/^매가/,/판매가$/,/할인전판매/]],
   ['commission_amt','수수료',false,[/수수료금액/,/수수료$/]],
   ['return_amount','반품',false,[/반품/,/취소/]],
   ['cost_amount','원가',false,[/원가/,/매입/]],
   ['tax_type','과세구분',false,[/과세구분/,/과면세/,/^과세$/,/면세여부/]],
   ['broadcast_date','방송일',false,[/방송일/,/판매일/,/일자/,/날짜/]],
   ['product_code','상품코드',false,[/상품코드/,/품목코드/,/코드/]],
-  ['media','매체',false,[/매체/,/채널구분/,/방송구분/]]
+  ['media','매체',false,[/매체/,/채널구분/,/방송구분/]],
+  ['deal_form','거래유형(직매입/위수탁)',false,[/매입유형/,/거래유형/,/직매입/,/위수탁/]]
 ];
 let SU={wb:null,file:'',grid:[],hdr:[],map:{},rows:[],brands:[]};
 function suNum(v){if(v==null||v==='')return null;if(typeof v==='number')return v;
@@ -1848,6 +1852,8 @@ function suExtract(){
     put('sellout_amount',v=>Math.round(suNum(v)||0));put('commission_amt',v=>Math.round(suNum(v)||0));
     put('return_amount',v=>Math.round(suNum(v)||0));put('cost_amount',v=>Math.round(suNum(v)||0));
     put('product_code',v=>String(v).trim());put('media',v=>String(v).trim());
+    if(m.deal_form>=0){const t=String(row[m.deal_form]||'');rec.deal_form=/직매입/.test(t)?'직매입':(/위수탁|특약/.test(t)?'위수탁':null);}
+    if(!rec.deal_form){const fn=SU.file||'';rec.deal_form=/직매입/.test(fn)?'직매입':(/위수탁|특약/.test(fn)?'위수탁':null);}
     if(m.tax_type>=0){const t=String(row[m.tax_type]||'');rec.tax_type=/면/.test(t)?'면세':(/과/.test(t)?'과세':null);}
     if(m.broadcast_date>=0){const v=row[m.broadcast_date];
       if(v instanceof Date)rec.broadcast_date=v.toISOString().slice(0,10);
@@ -1884,6 +1890,8 @@ $('suPreview')&&($('suPreview').onclick=async()=>{
       <div class="kpi brand"><div class="l">읽은 행</div><div class="v">${won(rows.length)}행</div><div class="s">합계행 ${skipped.sum} · 빈행 ${skipped.empty} 제외</div></div>
       <div class="kpi"><div class="l">매출총액 합</div><div class="v">${eok(sum)}</div></div>
       <div class="kpi ${noBrand?'warn':''}"><div class="l">브랜드 미매칭</div><div class="v">${noBrand}행</div><div class="s">저장 후 검수에서 확인</div></div>
+      <div class="kpi ${rows.filter(r=>r.sellout_amount==null).length?'warn':''}"><div class="l">소비자판매가 미입력</div><div class="v">${rows.filter(r=>r.sellout_amount==null).length}행</div><div class="s">영업기준이 정산액으로 잡힙니다</div></div>
+      <div class="kpi"><div class="l">거래유형</div><div class="v" style="font-size:15px">${[...new Set(rows.map(r=>r.deal_form||'미지정'))].join(' · ')}</div></div>
     </div>
     <div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
       <thead><tr style="color:var(--ink3)"><th class="l" style="padding:4px 8px">품목</th><th>수량</th><th>매출총액</th><th>공급가</th><th>신고금액</th><th>SellOut</th><th>과세</th><th class="l">방송일</th><th class="l">브랜드</th></tr></thead>
@@ -1908,7 +1916,10 @@ $('suSave')&&($('suSave').onclick=async()=>{
   const btn=$('suSave');btn.disabled=true;btn.textContent='저장 중…';
   try{
     if($('suReplace').checked){
-      const {error:de}=await sb.from('hs_settle_raw').delete().eq('channel_id',ch).eq('settle_month',ym);
+      const forms=[...new Set(SU.rows.map(r=>r.deal_form).filter(Boolean))];
+      let q=sb.from('hs_settle_raw').delete().eq('channel_id',ch).eq('settle_month',ym);
+      if(forms.length===1)q=q.eq('deal_form',forms[0]);       // 직매입 파일이 위수탁분을 지우지 않도록
+      const {error:de}=await q;
       if(de)throw de;
     }
     const who=(ME&&ME.name)||$('who').textContent;
@@ -2013,7 +2024,9 @@ const AUDIT_ITEMS=[
   ['only_settle','정산만 있고 편성 없음','only_settle'],
   ['gap','잠정↔확정 차이 20% 이상','big_gap'],
   ['ppl','PPL 비용 미입력 (프로그램만 있고 금액 0)','ppl_no_cost'],
-  ['brand','정산 브랜드 미분류','brand_null']
+  ['brand','정산 브랜드 미분류','brand_null'],
+  ['sellout','소비자판매가 미입력 (영업기준이 정산액으로 잡힘)','sellout_missing'],
+  ['dealform','거래유형(직매입/위수탁) 미지정','dealform_missing']
 ];
 let AUD={rows:[],cur:null};
 $('auditClose')&&($('auditClose').onclick=()=>$('auditMask').style.display='none');
@@ -2365,15 +2378,18 @@ function agRenderMonth(){
   const ym=$('agPeriod').value;
   const rows=(AG_SETTLE||[]).filter(s=>s.ym===ym);
   const byAg={};
-  rows.forEach(s=>{const k=s.agency_id;(byAg[k]=byAg[k]||{gross:0,fee:0,chs:new Set()});byAg[k].gross+=+s.gross_amount||0;byAg[k].fee+=+s.fee||0;byAg[k].chs.add(s.channel);});
+  rows.forEach(s=>{const k=s.agency_id;(byAg[k]=byAg[k]||{gross:0,fee:0,chs:new Set(),vatIn:false});
+    // VAT포함 정산서는 VAT별도로 환산해 담는다(청구서에서 VAT를 또 붙이는 이중가산 방지)
+    const d=s.vat_included?1.1:1;
+    byAg[k].gross+=(+s.gross_amount||0)/d;byAg[k].fee+=(+s.fee||0)/d;byAg[k].chs.add(s.channel);if(s.vat_included)byAg[k].vatIn=true;});
   const list=Object.keys(byAg).map(id=>({id,name:agName(id),...byAg[id]})).sort((a,z)=>z.fee-a.fee);
   const tG=list.reduce((s,x)=>s+x.gross,0),tF=list.reduce((s,x)=>s+x.fee,0);
-  $('agSummary').innerHTML=agCards([['대행사',list.length+'곳'],['매출총액(VAT-)',won(tG)+'원'],['대행 수수료(VAT-)',won(tF)+'원'],['수수료+VAT(청구)',won(Math.round(tF*1.1))+'원']]);
+  $('agSummary').innerHTML=agCards([['대행사',list.length+'곳'],['매출총액(VAT-)',won(Math.round(tG))+'원'],['대행 수수료(VAT-)',won(Math.round(tF))+'원'],['수수료+VAT(청구)',won(Math.round(tF*1.1))+'원']]);
   tbl('t_agMonth',[
-    {h:'대행사',l:true,f:r=>esc(r.name)},
+    {h:'대행사',l:true,f:r=>esc(r.name)+(r.vatIn?' <span class="chip" style="background:#FEF3C7;color:#B45309;font-size:9px">VAT포함 정산서 → 환산</span>':'')},
     {h:'홈사수',f:r=>r.chs.size},
-    {h:'매출총액(VAT-)',f:r=>won(r.gross)},
-    {h:'수수료(VAT-)',f:r=>won(r.fee)},
+    {h:'매출총액(VAT-)',f:r=>won(Math.round(r.gross))},
+    {h:'수수료(VAT-)',f:r=>won(Math.round(r.fee))},
     {h:'VAT(10%)',f:r=>won(Math.round(r.fee*0.1))},
     {h:'청구액(수수료+VAT)',f:r=>'<b>'+won(Math.round(r.fee*1.1))+'</b>'}
   ],list,ym+' 대행 정산 없음',null,r=>agShowDetail(ym,r.id,r.name),{filter:true});
@@ -2383,9 +2399,11 @@ function agShowDetail(ym,agId,name){
   $('agDetailBox').classList.remove('hidden');
   tbl('t_agDetail',[
     {h:name+' · 홈쇼핑사',l:true,f:r=>esc(r.channel)},
-    {h:'매출총액(VAT-)',f:r=>won(r.gross_amount)},
+    {h:'매출총액(VAT-)',f:r=>won(Math.round((+r.gross_amount||0)/(r.vat_included?1.1:1)))},
     {h:'수수료율',f:r=>r.rate!=null?(+(r.rate*100).toFixed(2))+'%':'-'},
-    {h:'수수료(VAT-)',f:r=>won(r.fee)}
+    {h:'수수료(VAT-)',f:r=>won(Math.round((+r.fee||0)/(r.vat_included?1.1:1)))},
+    {h:'정산서 기준',l:1,f:r=>r.vat_included?'<span class="chip" style="background:#FEF3C7;color:#B45309">VAT포함(환산됨)</span>':'VAT별도'},
+    {h:'정산서 원금액',f:r=>won(r.gross_amount)}
   ],rows,'상세 없음');
   $('agDetailBox').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -2395,9 +2413,10 @@ function agRenderYear(){
   const rows=(AG_SETTLE||[]).filter(s=>s.ym.slice(0,4)===yr);
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
   const ags=[...new Set(rows.map(s=>s.agency_id))].map(id=>({id,name:agName(id)}));
-  const grid={};rows.forEach(s=>{const g=grid[s.agency_id]=grid[s.agency_id]||{};const m=s.ym.slice(5);g[m]=(g[m]||0)+(+s.fee||0);});
-  const tF=rows.reduce((s,x)=>s+(+x.fee||0),0),tG=rows.reduce((s,x)=>s+(+x.gross_amount||0),0);
-  $('agSummary').innerHTML=agCards([['연도',yr+'년'],['대행사',ags.length+'곳'],['매출총액',won(tG)+'원'],['수수료 합계',won(tF)+'원']]);
+  const ex=s=>s.vat_included?1.1:1;
+  const grid={};rows.forEach(s=>{const g=grid[s.agency_id]=grid[s.agency_id]||{};const m=s.ym.slice(5);g[m]=(g[m]||0)+(+s.fee||0)/ex(s);});
+  const tF=rows.reduce((s,x)=>s+(+x.fee||0)/ex(x),0),tG=rows.reduce((s,x)=>s+(+x.gross_amount||0)/ex(x),0);
+  $('agSummary').innerHTML=agCards([['연도',yr+'년'],['대행사',ags.length+'곳'],['매출총액(VAT-)',won(Math.round(tG))+'원'],['수수료 합계(VAT-)',won(Math.round(tF))+'원']]);
   const cols=[{h:'대행사',l:true,f:r=>esc(r.name)}];
   months.forEach(m=>cols.push({h:(+m)+'월',f:r=>{const v=(grid[r.id]||{})[m];return v?won(Math.round(v)):'<span style="opacity:.25">-</span>';}}));
   cols.push({h:'합계',f:r=>'<b>'+won(Math.round(months.reduce((s,m)=>s+((grid[r.id]||{})[m]||0),0)))+'</b>'});
@@ -2468,40 +2487,52 @@ function agDetectAgency(fname){
   return null;
 }
 function agDetectYm(fname){const m=fname.match(/(\d{4})\s*년?\s*(\d{1,2})\s*월/);return m?`${m[1]}-${String(+m[2]).padStart(2,'0')}`:null;}
+const AG_TOTWORDS=['계','소계','총계','합계','총 계','합 계','소 계'];
+function agIsCh(s){return /롯데|CJ|씨제이|현대|GS|지에스|NS|엔에스|SK|K쇼핑|케이쇼핑|신세계|홈앤|쇼핑엔티|공영|W쇼핑/i.test(String(s).replace(/\s/g,''));}
 function agParseSheet(wb){
-  // 요약/정산서/비용 시트 우선
+  // 요약/정산서/벤더수수료/최종견적 시트 우선
   let sn=wb.SheetNames.find(n=>['요약','정산서'].includes(n)) || wb.SheetNames.find(n=>n.includes('벤더 수수료')) || wb.SheetNames.find(n=>n.includes('최종견적')) || wb.SheetNames[0];
   const ws=wb.Sheets[sn];
   const grid=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  // 헤더행 찾기
   let hr=-1;
-  for(let r=0;r<Math.min(grid.length,13);r++){const row=grid[r]||[];if(row.some(c=>typeof c==='string'&&(c.replace(/\s|\n/g,'').includes('매출총액')||c.replace(/\s|\n/g,'').includes('총매출')))){hr=r;break;}}
-  if(hr<0)return {sheet:sn,rows:[]};
+  for(let r=0;r<Math.min(grid.length,15);r++){const row=grid[r]||[];if(row.some(c=>typeof c==='string'&&(c.replace(/\s|\n/g,'').includes('매출총액')||c.replace(/\s|\n/g,'').includes('총매출')))){hr=r;break;}}
+  if(hr<0)return {sheet:sn,rows:[],vatIncluded:false};
   const hdr=(grid[hr]||[]).map(c=>c==null?'':String(c).replace(/\s|\n/g,''));
-  const find=preds=>{for(let i=0;i<hdr.length;i++){for(const p of preds){if(p(hdr[i]))return i;}}return -1;};
+  // ⚠ 우선순위대로 찾는다(헤더 순서가 아니라 조건 순서). '상품명'이 병합셀이라 먼저 잡히면 명세가 통째로 누락됨.
+  const find=preds=>{for(const p of preds){for(let i=0;i<hdr.length;i++){if(p(hdr[i]))return i;}}return -1;};
   const ci={
     gross:find([h=>h.includes('매출총액'),h=>h.includes('총매출')]),
     fee:find([h=>h.includes('수수료')&&!h.includes('율')]),
-    ch:find([h=>h.includes('판매처')]),
-    item:find([h=>h.includes('구성'),h=>h.includes('상품명')])
+    ch:find([h=>h.includes('판매처'),h=>h==='구분']),
+    item:find([h=>h.includes('구성'),h=>h.includes('상품명'),h=>h.includes('상품코드'),h=>h.includes('항목')])
   };
-  if(ci.gross<0||ci.ch<0)return {sheet:sn,rows:[]};
-  const acc={};let cur=null;
+  if(ci.gross<0||ci.ch<0)return {sheet:sn,rows:[],vatIncluded:false};
+  // VAT 기준(상단 표기) — 대행사마다 'VAT포함'인 곳이 있어 청구서에서 이중 가산되면 안 됨
+  let vatIncluded=false;
+  for(let r=0;r<Math.min(hr+1,8);r++)for(const c of (grid[r]||[]))if(typeof c==='string'&&/VAT\s*포함/i.test(c))vatIncluded=true;
+  const det={},tot={};let cur=null;
   for(let r=hr+1;r<grid.length;r++){
     const row=grid[r]||[];
     const chv=row[ci.ch];
-    if(typeof chv==='string'&&chv.trim()&&!['소계','계','총계','합계'].includes(chv.trim()))cur=AG_CH_NORM(chv);
-    const g=row[ci.gross];const item=ci.item>=0?row[ci.item]:'x';
-    const lab=[row[0],row[1],row[2]].filter(x=>x!=null).join(' ');
-    if(['소계','총계','합계'].some(k=>lab.includes(k))&&!(typeof item==='string'&&item.trim()))continue;
-    if(typeof g!=='number')continue;
-    if(ci.item>=0&&!(typeof item==='string'&&item.trim()))continue;
-    if(!cur)cur='기타';
+    if(typeof chv==='string'&&chv.trim()&&!AG_TOTWORDS.includes(chv.trim())&&agIsCh(chv))cur=AG_CH_NORM(chv);
+    const g=row[ci.gross];
+    if(typeof g!=='number'||!cur)continue;
+    // 합계행 위치 판정: 판매처열보다 오른쪽 = 홈사별 소계(정답), 왼쪽/같은열 = 전체 총계(버림)
+    let ti=-1;
+    for(let i=0;i<Math.min(ci.gross,8);i++){const c=row[i];if(typeof c==='string'&&AG_TOTWORDS.includes(c.trim())){ti=i;break;}}
+    let bucket;
+    if(ti>=0){ if(ti<=ci.ch)continue; bucket=tot; }
+    else{ const it=ci.item>=0?row[ci.item]:'x'; if(!(it!=null&&String(it).trim()))continue; bucket=det; }
     const fe=(ci.fee>=0&&typeof row[ci.fee]==='number')?row[ci.fee]:0;
-    acc[cur]=acc[cur]||{gross:0,fee:0};acc[cur].gross+=g;acc[cur].fee+=fe;
+    bucket[cur]=bucket[cur]||{gross:0,fee:0};bucket[cur].gross+=g;bucket[cur].fee+=fe;
   }
-  const rows=Object.keys(acc).map(ch=>({channel:ch,gross:Math.round(acc[ch].gross),fee:Math.round(acc[ch].fee),rate:acc[ch].gross?+(acc[ch].fee/acc[ch].gross).toFixed(4):null}));
-  return {sheet:sn,rows};
+  // 홈사별 소계가 있으면 그것이 정산서의 공식 금액 → 우선. 없으면 명세 합계.
+  const keys=[...new Set([...Object.keys(tot),...Object.keys(det)])];
+  const rows=keys.map(ch=>{const a=tot[ch]||det[ch];return {channel:ch,gross:Math.round(a.gross),fee:Math.round(a.fee),
+      rate:a.gross?+(a.fee/a.gross).toFixed(4):null,
+      warn:(tot[ch]&&det[ch]&&Math.abs(tot[ch].gross-det[ch].gross)>1)?Math.round(det[ch].gross):null};})
+    .filter(r=>r.gross||r.fee);
+  return {sheet:sn,rows,vatIncluded};
 }
 let AG_STAGED=[];
 $('agFile').onchange=async e=>{
@@ -2512,8 +2543,8 @@ $('agFile').onchange=async e=>{
     try{
       const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});
       const agency=agDetectAgency(f.name);const ym=agDetectYm(f.name);
-      const {sheet,rows}=agParseSheet(wb);
-      AG_STAGED.push({file:f.name,agency,ym,sheet,rows,ok:!!(agency&&ym&&rows.length)});
+      const {sheet,rows,vatIncluded}=agParseSheet(wb);
+      AG_STAGED.push({file:f.name,agency,ym,sheet,rows,vatIncluded,ok:!!(agency&&ym&&rows.length)});
     }catch(err){AG_STAGED.push({file:f.name,error:String(err),ok:false});}
   }
   agRenderStaged();
@@ -2537,8 +2568,9 @@ function agRenderStaged(){
         <label style="font-size:12px;color:var(--ink3)">년월</label>
         <input data-i="${i}" data-k="ym" class="hsearch" style="max-width:110px" value="${esc(s.ym||'')}" placeholder="YYYY-MM">
         <span class="muted">홈사 ${s.rows.length} · 매출 ${won(gross)} · 수수료 ${won(fee)}</span>
+        ${s.vatIncluded?'<span class="chip" style="background:#FEF3C7;color:#B45309">VAT포함 정산서 → 청구액에 VAT 중복 가산 안 함</span>':'<span class="chip" style="background:var(--bg2);color:var(--ink3)">VAT별도</span>'}
       </div>`;
-      if(s.rows.length)html+=`<div class="muted" style="margin-top:6px;font-size:11.5px">${s.rows.map(r=>esc(r.channel)+' '+won(r.gross)+'/'+won(r.fee)).join(' · ')}</div>`;
+      if(s.rows.length)html+=`<div class="muted" style="margin-top:6px;font-size:11.5px">${s.rows.map(r=>esc(r.channel)+' '+won(r.gross)+'/'+won(r.fee)+(r.warn!=null?` <span style="color:var(--gold)">(명세합 ${won(r.warn)} — 소계와 불일치, 소계 채택)</span>`:'')).join(' · ')}</div>`;
     }
     html+=`</div>`;
   });
@@ -2555,7 +2587,7 @@ async function agSaveStaged(){
     if(!s.rows||!s.rows.length)continue;
     const agId=nameToId[s.agency];const ym=s.ym;
     if(!agId||!ym){fail++;continue;}
-    const payload=s.rows.map(r=>({agency_id:agId,ym,channel:r.channel,gross_amount:r.gross,rate:r.rate,fee:r.fee,source:'upload',file_name:s.file}));
+    const payload=s.rows.map(r=>({agency_id:agId,ym,channel:r.channel,gross_amount:r.gross,rate:r.rate,fee:r.fee,vat_included:!!s.vatIncluded,source:'upload',file_name:s.file}));
     const {error}=await sb.from('hs_agency_settle').upsert(payload,{onConflict:'agency_id,ym,channel,source'});
     if(error){fail++;}else{n+=payload.length;}
   }
@@ -2944,11 +2976,12 @@ function renderChannels(){
     {h:'라이브 짝',l:1,f:r=>r._parent?esc(r._parent):'<span class="muted">–</span>'},
     {h:'코드',l:1,f:r=>r.code||'–'},
     {h:'매출인식',l:1,f:r=>`<select class="cell2" style="text-align:left;font-weight:700;color:${r.revenue_method==='순액법'?'#7C3AED':r.revenue_method==='총액법'?'#0f9d58':'var(--ink3)'}" data-id="${r.id}" data-f="revenue_method"><option value="">미지정</option>${['총액법','순액법'].map(v=>`<option ${r.revenue_method===v?'selected':''}>${v}</option>`).join('')}</select>`},
+    {h:'거래유형 기본',l:1,f:r=>`<select class="cell2" style="text-align:left" data-id="${r.id}" data-f="deal_form_default"><option value="">미지정</option>${['직매입','위수탁','혼합'].map(v=>`<option ${r.deal_form_default===v?'selected':''}>${v}</option>`).join('')}</select>`},
     {h:'기본수수료% <span class="muted" style="font-weight:400">(순액 역산용)</span>',f:r=>`<input class="cell2" type="number" data-id="${r.id}" data-f="commission_default" value="${r.commission_default!=null?Math.round(r.commission_default*100):''}">`},
     {h:'정산주기 <span class="muted" style="font-weight:400">(방송일 구간→지급일)</span>',l:1,f:r=>r._cycle&&r._cycle.length?r._cycle.map(x=>`<div style="font-size:10.5px;white-space:nowrap;line-height:1.5">${esc(x)}</div>`).join(''):'<span class="muted">미등록</span>'}
   ],CHS,'홈사 없음',()=>{
   document.querySelectorAll('#t_channels [data-id]').forEach(el=>el.addEventListener('input',()=>{const r=CHS.find(x=>x.id===el.dataset.id),f=el.dataset.f;let v=el.value;if(f==='commission_default')v=v===''?null:(+v/100);r[f]=v;}));});}
-$('chSave').onclick=async()=>{let ok=0;for(const c of CHS){const {error}=await sb.from('hs_channels').update({revenue_method:c.revenue_method||null,commission_default:c.commission_default,updated_by:$('who').textContent}).eq('id',c.id);if(!error)ok++;}toast(ok+'개 홈사 저장','ok');};
+$('chSave').onclick=async()=>{let ok=0;for(const c of CHS){const {error}=await sb.from('hs_channels').update({revenue_method:c.revenue_method||null,deal_form_default:c.deal_form_default||null,commission_default:c.commission_default,updated_by:$('who').textContent}).eq('id',c.id);if(!error)ok++;}toast(ok+'개 홈사 저장','ok');};
 let BR_FILTER='prod';
 function stripLine(line,core){if(!line)return '';if(core&&line.startsWith(core)){const t=line.slice(core.length).trim();return t||'기본';}return line;}
 async function loadBrands(){if(!AUTHED){$('t_brands').innerHTML='<tr><td class="state">로그인 후 표시</td></tr>';return;}

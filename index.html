@@ -512,10 +512,20 @@ tbody tr:hover{background:var(--bg1)}
       <div class="view" id="v-agency">
         <div class="sechead"><h2 class="sec">대행 결산</h2><span class="tag">위탁사 대행 수수료</span></div>
         <p class="hint">타사 제품을 홈쇼핑에 <b>대행 판매</b>하고 <b>매출총액의 일정 %</b>를 수수료로 받습니다. 정산은 <b>대행사별 월 1회</b>. 아래 <b>정산서 업로드</b>로 엑셀을 올리면 홈사별 매출·수수료를 자동으로 읽어 집계합니다.</p>
-        <div class="toolbar seg" id="agTabs" style="max-width:780px;margin:0 0 12px"><button class="on" data-v="month">월별 청구</button><button data-v="pnl">방송결과기준</button><button data-v="recon">현장 대조</button><button data-v="master">대행사·요율</button><button data-v="upload">정산서 업로드</button></div>
+        <div class="toolbar seg" id="agTabs" style="max-width:780px;margin:0 0 12px"><button class="on" data-v="pnl">방송결과기준</button><button data-v="month">월별 청구</button><button data-v="recon">현장 대조</button><button data-v="master">대행사·요율</button><button data-v="upload">정산서 업로드</button></div>
+
+        <!-- 방송별 손익 (대행 우리수익 잠정) -->
+        <div id="agPnl">
+          <p class="hint">자사 결산과 같은 <b>방송결과기준(방송당)</b> 포맷입니다. 손익을 둘로 봅니다 — <b>대행사 잠정손익</b>: 대행사 입장의 방송 손익(자사식 계산, 정액비·홈사수수료·원가 등 차감) · <b>우리 잠정매출익</b>: 방송 매출 × <b>대행수수료율</b>(우리가 받는 몫). 요율이 <b>미등록</b>이면 <b>대행사·요율</b>에서 대행사·홈사별 요율을 넣으면 자동 반영됩니다.</p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <label style="margin:0;color:var(--ink3);font-size:12px">기간</label><input type="month" id="agPnlPeriod" class="hsearch" style="max-width:150px">
+          </div>
+          <div class="scroll" id="agPnlSummary" style="margin-bottom:14px"></div>
+          <div class="card scroll" style="padding:0"><table id="t_agPnl"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+        </div>
 
         <!-- 월별 청구 -->
-        <div id="agMonth">
+        <div id="agMonth" class="hidden">
           <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <label style="margin:0;color:var(--ink3);font-size:12px">기준월</label><input type="month" id="agPeriod" class="hsearch" style="max-width:150px">
             <label style="margin:0;color:var(--ink3);font-size:12px">보기</label>
@@ -536,16 +546,6 @@ tbody tr:hover{background:var(--bg1)}
           </div>
           <div id="agUnmapped" style="margin-bottom:10px"></div>
           <div class="card scroll" style="padding:0"><table id="t_agRecon"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
-        </div>
-
-        <!-- 방송별 손익 (대행 우리수익 잠정) -->
-        <div id="agPnl" class="hidden">
-          <p class="hint">자사 결산과 같은 <b>방송결과기준(방송당)</b> 포맷입니다. 손익을 둘로 봅니다 — <b>대행사 잠정손익</b>: 대행사 입장의 방송 손익(자사식 계산, 정액비·홈사수수료·원가 등 차감) · <b>우리 잠정매출익</b>: 방송 매출 × <b>대행수수료율</b>(우리가 받는 몫). 요율이 <b>미등록</b>이면 <b>대행사·요율</b>에서 대행사·홈사별 요율을 넣으면 자동 반영됩니다.</p>
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-            <label style="margin:0;color:var(--ink3);font-size:12px">기간</label><input type="month" id="agPnlPeriod" class="hsearch" style="max-width:150px">
-          </div>
-          <div class="scroll" id="agPnlSummary" style="margin-bottom:14px"></div>
-          <div class="card scroll" style="padding:0"><table id="t_agPnl"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
         </div>
 
         <!-- 대행사·요율 -->
@@ -2371,7 +2371,7 @@ function pctl(arr,q){if(!arr||!arr.length)return null;const a=[...arr].sort((x,y
 function pnlAt(a,P){const cs=P.t*a/100*P.cv;return P.fee==='정률'?cs*(1-P.rate-P.cr):cs*(1-P.cr)-P.fx;}   // 손익(달성률 a%)
 function breakEven(P){if(P.fee==='정률')return (1-P.rate-P.cr)>0?0:Infinity;const d=(1-P.cr)*P.t*P.cv;return d>0?P.fx/d*100:Infinity;}
 /* ===== 대행 정산 (agency) ===== */
-let AG_LIST=null, AG_SETTLE=null, AG_TAB='month', AG_EDIT=null, AG_BC=null, AG_UNMAP=null;
+let AG_LIST=null, AG_SETTLE=null, AG_TAB='pnl', AG_EDIT=null, AG_BC=null, AG_UNMAP=null;
 async function agLoadData(force){
   if(AG_LIST && !force) return;
   const [{data:ags},{data:rates},{data:st},{data:bc},{data:um}]=await Promise.all([
@@ -2390,6 +2390,7 @@ async function loadAgency(){
   await agLoadData();
   const p=$('agPeriod');
   if(!p.value){const yms=[...new Set((AG_SETTLE||[]).map(s=>s.ym))].sort();p.value=yms.length?yms[yms.length-1]:new Date().toISOString().slice(0,7);}
+  const pp=$('agPnlPeriod');if(pp&&!pp.value)pp.value=p.value;
   if(!$('agViewSeg').dataset.v)$('agViewSeg').dataset.v='one';
   agSub(AG_TAB);
 }

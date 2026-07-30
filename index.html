@@ -846,11 +846,29 @@ tbody tr:hover{background:var(--bg1)}
     </div>
   </div>
 </div>
+<div class="mask" id="qNoticeMask" style="position:fixed;inset:0;background:rgba(15,42,63,.45);display:none;align-items:center;justify-content:center;z-index:59;padding:20px">
+  <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);max-width:600px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="background:#0F2A3F;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:9px">
+      <span style="font-size:19px">📢</span>
+      <div><div style="font-size:15px;font-weight:800" id="qNoticeTitle">업무 지시</div>
+        <div style="font-size:11.5px;opacity:.75" id="qNoticeSub"></div></div>
+    </div>
+    <div style="padding:16px 20px;overflow:auto;flex:1" id="qNoticeBody"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--line1);display:flex;gap:8px;align-items:center">
+      <button class="btn primary" id="qNoticeGo">업무 지시로 가기</button>
+      <button class="btn" id="qNoticeLater">나중에</button>
+      <div class="spacer"></div>
+      <label class="muted" style="display:flex;gap:5px;align-items:center;font-size:11.5px"><input type="checkbox" id="qNoticeMute"> 오늘 하루 안 보기</label>
+    </div>
+  </div>
+</div>
 <div class="mask" id="qNewMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:57;padding:20px">
   <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:520px;width:100%;max-height:92vh;overflow:auto">
     <div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:16px">새 지시</b><div class="spacer"></div><button class="btn sm" id="qNewClose">닫기</button></div>
-    <label style="font-size:12px;color:var(--ink3)">담당자 <span style="opacity:.6">(여러 명 선택 시 각각 지시가 생성됩니다 · Ctrl로 복수)</span></label>
+    <label style="font-size:12px;color:var(--ink3)">주담당 <span style="opacity:.6">(여러 명 선택 시 각각 지시가 생성됩니다 · Ctrl로 복수)</span></label>
     <select id="qN_assignee" multiple size="6" style="width:100%;margin:2px 0 10px;height:auto;padding:6px;border:1px solid var(--line1);border-radius:9px;font-family:inherit;font-size:12.5px"></select>
+    <label style="font-size:12px;color:var(--ink3)">함께 할 사람 <span style="opacity:.6">(선택 · 지시 목록에 같이 표시됩니다. 팀원은 모두 조회·작성 가능)</span></label>
+    <select id="qN_collab" multiple size="4" style="width:100%;margin:2px 0 10px;height:auto;padding:6px;border:1px solid var(--line1);border-radius:9px;font-family:inherit;font-size:12.5px"></select>
     <label style="font-size:12px;color:var(--ink3)">제목</label><input id="qN_title" class="hsearch" style="width:100%;margin:2px 0 10px" placeholder="예: 2026-06 정산 검수">
     <label style="font-size:12px;color:var(--ink3)">내용·요청사항</label>
     <textarea id="qN_body" class="hsearch" style="width:100%;box-sizing:border-box;min-height:80px;margin:2px 0 10px" placeholder="무엇을 어디서 어떻게 하면 되는지 적어주세요"></textarea>
@@ -1344,12 +1362,13 @@ function applyMemberGate(){
 async function questPing(){
   if(!ME||!ME.user_id)return;
   const boss=qIsBoss();
-  let q=sb.from('co_work_request').select('id,title,status,due_at,assignee_id').in('status',boss?['open','doing','reported']:['open','doing']);
-  if(!boss)q=q.eq('assignee_id',ME.user_id);
-  const {data,error}=await q;if(error)return;
-  const rows=data||[];
+  if(!Q.members.length){const {data:mm}=await sb.from('hs_member').select('user_id,name,team,grade').order('name');Q.members=mm||[];}
+  const {data,error}=await sb.from('co_work_request').select('*').in('status',['open','doing','reported']);
+  if(error)return;
+  const rows=(data||[]).filter(r=>(r.module||'hs')==='hs');
+  Q.rows=rows;
   const wait=rows.filter(r=>r.status==='reported').length;
-  const mine=rows.filter(r=>r.assignee_id===ME.user_id&&['open','doing'].includes(r.status));
+  const mine=rows.filter(r=>qMine(r)&&['open','doing'].includes(r.status));
   const over=mine.filter(r=>r.due_at&&new Date(r.due_at)<new Date()).length;
   const n=boss?wait:mine.length;
   const b=$('qNavBadge');if(b){b.style.display=n?'':'none';b.textContent=n;}
@@ -1357,6 +1376,37 @@ async function questPing(){
   if(boss&&wait){$('qBannerTxt').innerHTML=`팀원이 완료 보고한 업무 <b>${wait}건</b>이 확인을 기다리고 있습니다.`;bn.style.display='flex';}
   else if(!boss&&mine.length){$('qBannerTxt').innerHTML=`나에게 지시된 업무 <b>${mine.length}건</b>이 있습니다.${over?` (기한 초과 <b style="color:#B91C1C">${over}건</b>)`:''} 끝내면 완료 보고를 눌러주세요.`;bn.style.display='flex';}
   else bn.style.display='none';
+  questNotice(boss?rows.filter(r=>r.status==='reported'):mine, boss, over);
+}
+// 접속하면 공지처럼 먼저 띄운다 (기한 초과가 있으면 '오늘 안 보기'와 무관하게 항상)
+function questNotice(list,boss,over){
+  const mask=$('qNoticeMask');if(!mask||!list||!list.length)return;
+  const today=new Date().toISOString().slice(0,10);
+  const sig=today+'|'+list.map(r=>r.id).sort().join(',');
+  try{ if(!over && localStorage.getItem('hsQNotice')===sig) return; }catch(_){}
+  const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
+  $('qNoticeTitle').textContent=boss?'확인 대기 중인 완료 보고':'나에게 온 업무 지시';
+  $('qNoticeSub').textContent=boss?`${list.length}건이 확인을 기다리고 있습니다`
+    :`${list.length}건${over?` · 기한 초과 ${over}건`:''} — 끝내면 완료 보고를 눌러주세요`;
+  $('qNoticeBody').innerHTML=list.slice(0,8).map(r=>{
+    const od=r.due_at&&new Date(r.due_at)<new Date()&&['open','doing'].includes(r.status);
+    const p=Q_PRIO[r.priority]||Q_PRIO.normal;
+    return `<div style="border:1px solid ${od?'#FCA5A5':'var(--line1)'};background:${od?'#FEF2F2':'var(--bg1)'};border-radius:11px;padding:12px 14px;margin-bottom:9px;cursor:pointer" onclick="document.getElementById('qNoticeMask').style.display='none';navTo('quest');setTimeout(()=>questOpen('${r.id}'),400)">
+      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+        <b style="font-size:13px">${esc(r.title||'')}</b>
+        <span style="color:${p[1]};font-size:10.5px;font-weight:700">${p[0]}</span>
+        ${od?'<span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':''}
+        ${boss?`<span class="muted" style="font-size:11px">${esc(nameOf(r.assignee_id))}</span>`:''}
+      </div>
+      <div class="muted" style="font-size:11.5px;white-space:pre-wrap;line-height:1.5">${esc(String(r.body||'').slice(0,150))}${String(r.body||'').length>150?'…':''}</div>
+      ${r.due_at?`<div class="muted" style="font-size:11px;margin-top:5px">기한 ${esc(String(r.due_at).slice(0,10))}</div>`:''}
+    </div>`;}).join('')
+    +(list.length>8?`<div class="muted" style="font-size:11.5px">…외 ${list.length-8}건</div>`:'');
+  const close=()=>{ if($('qNoticeMute').checked){try{localStorage.setItem('hsQNotice',sig);}catch(_){}} mask.style.display='none'; };
+  $('qNoticeLater').onclick=close;
+  $('qNoticeGo').onclick=()=>{close();navTo('quest');};
+  mask.onclick=e=>{if(e.target===mask)close();};
+  mask.style.display='flex';
 }
 // 워크플로우 접근 허용 계정
 function wfAllowed(){return !!(ME&&(ME.email==='dbswlghd@gmail.com'||ME.user_id==='11111111-0000-0000-0000-000000000001'));}
@@ -1643,6 +1693,7 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
 const Q_STATUS={open:['지시','#F59E0B','#FEF3C7'],doing:['진행중','#3B82F6','#E0F2FE'],reported:['보고 완료 · 확인대기','#0D9488','#D6F5EC'],done:['확인 완료','#10B981','#D1FAE5'],canceled:['취소','#94A3B8','var(--bg2)']};
 const Q_PRIO={urgent:['긴급','#DC2626'],high:['높음','#B45309'],normal:['보통','var(--ink3)'],low:['낮음','var(--ink4)']};
 let Q={rows:[],members:[],tab:'todo',cur:null};
+function qMine(r){const me=ME&&ME.user_id;return r.assignee_id===me||(r.collaborators||[]).includes(me);}
 function qIsBoss(){return !!(ME&&(ME.is_admin||ME.grade==='임원'||ME.grade==='경영진'));}
 function qBadge(s){const v=Q_STATUS[s]||Q_STATUS.open;return `<span class="chip" style="background:${v[2]};color:${v[1]}">${v[0]}</span>`;}
 function qOverdue(r){return r.due_at&&['open','doing'].includes(r.status)&&new Date(r.due_at)<new Date(new Date().toDateString());}
@@ -1669,7 +1720,8 @@ async function loadQuest(){
     +`<div class="kpi ${over?'warn':''}"><div class="l">기한 초과</div><div class="v">${over}건</div></div>`
     +`<div class="kpi"><div class="l">전체 진행중</div><div class="v">${Q.rows.filter(r=>['open','doing','reported'].includes(r.status)).length}건</div></div>`
     +'</div>';
-  const tabs=boss?[['wait','확인대기'],['open','진행중'],['mine','내 할 일'],['all','전체']]:[['todo','내 할 일'],['reported','보고한 건'],['done','완료']];
+  const tabs=boss?[['wait','확인대기'],['open','진행중'],['mine','내 할 일'],['all','전체']]
+                 :[['todo','내 할 일'],['team','팀 전체 (함께 하기)'],['reported','보고한 건'],['done','완료']];
   if(!tabs.some(t=>t[0]===Q.tab))Q.tab=tabs[0][0];
   $('qTabs').innerHTML=tabs.map(t=>`<button class="${t[0]===Q.tab?'on':''}" data-v="${t[0]}">${t[1]}</button>`).join('');
   $('qTabs').querySelectorAll('button').forEach(x=>x.onclick=()=>{Q.tab=x.dataset.v;loadQuest();});
@@ -1680,14 +1732,15 @@ function renderQuest(){
   let rows=Q.rows;
   if(Q.tab==='wait')rows=rows.filter(r=>r.status==='reported');
   else if(Q.tab==='open')rows=rows.filter(r=>['open','doing'].includes(r.status));
-  else if(Q.tab==='mine'||Q.tab==='todo')rows=rows.filter(r=>r.assignee_id===me&&(Q.tab==='todo'?['open','doing'].includes(r.status):true));
-  else if(Q.tab==='reported')rows=rows.filter(r=>r.assignee_id===me&&r.status==='reported');
-  else if(Q.tab==='done')rows=rows.filter(r=>r.assignee_id===me&&r.status==='done');
+  else if(Q.tab==='mine'||Q.tab==='todo')rows=rows.filter(r=>qMine(r)&&(Q.tab==='todo'?['open','doing'].includes(r.status):true));
+  else if(Q.tab==='team')rows=rows.filter(r=>['open','doing','reported'].includes(r.status));
+  else if(Q.tab==='reported')rows=rows.filter(r=>qMine(r)&&r.status==='reported');
+  else if(Q.tab==='done')rows=rows.filter(r=>qMine(r)&&r.status==='done');
   const nameOf=id=>(Q.members.find(m=>m.user_id===id)||{}).name||'-';
   tbl('t_quest',[
     {h:'상태',l:1,f:r=>qBadge(r.status)+(qOverdue(r)?' <span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':'')},
     {h:'제목',l:1,f:r=>`<b>${esc(r.title||'')}</b>${r.body?`<div class="muted" style="font-size:10.5px;margin-top:2px">${esc(String(r.body).slice(0,46))}${String(r.body).length>46?'…':''}</div>`:''}`},
-    {h:'담당자',l:1,f:r=>esc(nameOf(r.assignee_id))},
+    {h:'담당',l:1,f:r=>esc(nameOf(r.assignee_id))+((r.collaborators&&r.collaborators.length)?` <span class="muted" style="font-size:10px">+${r.collaborators.length}</span>`:'')},
     {h:'우선',l:1,f:r=>{const p=Q_PRIO[r.priority]||Q_PRIO.normal;return `<span style="color:${p[1]};font-weight:700">${p[0]}</span>`;}},
     {h:'기한',l:1,f:r=>r.due_at?String(r.due_at).slice(0,10):'<span class="muted">–</span>'},
     {h:'지시일',l:1,f:r=>String(r.created_at||'').slice(5,10)},
@@ -1696,21 +1749,21 @@ function renderQuest(){
 }
 function questOpen(id){
   const r=Q.rows.find(x=>x.id===id);if(!r)return;Q.cur=r;
-  const boss=qIsBoss(),me=ME&&ME.user_id,mine=r.assignee_id===me;
+  const boss=qIsBoss(),me=ME&&ME.user_id,mine=true;   // 협업: 팀원 누구나 작성·보고 가능 (주담당은 표시용)
   const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
   $('qD_title').textContent=r.title||'지시';
   $('qD_body').innerHTML=`
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">${qBadge(r.status)}
-      <span class="muted" style="font-size:11.5px">담당 ${esc(nameOf(r.assignee_id))} · 지시 ${esc(String(r.created_at||'').slice(0,10))}${r.due_at?' · 기한 '+esc(String(r.due_at).slice(0,10)):''}</span>
+      <span class="muted" style="font-size:11.5px">주담당 ${esc(nameOf(r.assignee_id))}${(r.collaborators&&r.collaborators.length)?' · 함께 '+esc(r.collaborators.map(nameOf).join(', ')):''} · 지시 ${esc(String(r.created_at||'').slice(0,10))}${r.due_at?' · 기한 '+esc(String(r.due_at).slice(0,10)):''}</span>
       ${qOverdue(r)?'<span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':''}</div>
     <div style="background:var(--bg1);border-radius:10px;padding:11px 13px;font-size:12.5px;white-space:pre-wrap;line-height:1.55">${esc(r.body||'(내용 없음)')}</div>
     ${r.report_body?`<div style="margin-top:10px"><div class="muted" style="font-size:11px;font-weight:700">완료 보고 · ${esc(String(r.reported_at||'').slice(0,16).replace('T',' '))}</div>
       <div style="border:1px solid #CFE9E5;background:#FBFEFD;border-radius:10px;padding:11px 13px;font-size:12.5px;white-space:pre-wrap;margin-top:4px">${esc(r.report_body)}</div></div>`:''}
     ${r.reject_reason?`<div style="margin-top:8px;color:var(--blocked);font-size:11.5px">반려 사유: ${esc(r.reject_reason)}</div>`:''}
-    ${(mine&&['open','doing'].includes(r.status))?`<div style="margin-top:10px"><label class="muted" style="font-size:11px">완료 보고 내용</label>
+    ${(mine&&['open','doing'].includes(r.status))?`<div style="margin-top:10px"><label class="muted" style="font-size:11px">완료 보고 내용 <span style="opacity:.7">— 팀원 누구나 이어서 쓸 수 있습니다</span></label>
       <textarea id="qD_report" class="hsearch" style="width:100%;box-sizing:border-box;min-height:70px" placeholder="예: 2026-06 검수 완료 — 정산 미도착 7건은 홈사 확인 후 8월 반영 예정으로 사유 기재"></textarea></div>`:''}`;
   let btns='';
-  if(mine&&['open','doing'].includes(r.status))btns+='<button class="btn primary sm" id="qD_send">완료 보고</button>';
+  if(mine&&['open','doing'].includes(r.status))btns+='<button class="btn primary sm" id="qD_send">완료 보고</button><button class="btn sm" id="qD_join">진행중으로 표시</button>';
   if(boss&&r.status==='reported')btns+='<button class="btn primary sm" id="qD_ok">확인 완료</button><button class="btn sm" id="qD_back" style="color:var(--blocked)">반려(재작업)</button>';
   if(boss&&['open','doing'].includes(r.status))btns+='<button class="btn sm" id="qD_cancel" style="color:var(--blocked)">지시 취소</button>';
   btns+='<div class="spacer"></div><span class="muted" id="qD_msg" style="font-size:11.5px"></span>';
@@ -1722,7 +1775,12 @@ function questOpen(id){
     toast(msg,'ok');$('qDetMask').style.display='none';loadQuest();};
   $('qD_send')&&($('qD_send').onclick=()=>{const t=($('qD_report').value||'').trim();
     if(!t){$('qD_msg').innerHTML='<span style="color:var(--gold)">무엇을 했는지 한 줄 남겨주세요</span>';return;}
-    upd({status:'reported',report_body:t,reported_at:new Date().toISOString(),reported_by:me},'완료 보고 전송 — 대표 확인 대기');});
+    const who=(ME&&ME.name)||'',stamp=`[${who} · ${new Date().toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}]`;
+    const merged=(r.report_body?r.report_body+'\n\n':'')+stamp+'\n'+t;   // 여러 명이 이어서 쓴다
+    upd({status:'reported',report_body:merged,reported_at:new Date().toISOString(),reported_by:me},'완료 보고 전송 — 대표 확인 대기');});
+  $('qD_join')&&($('qD_join').onclick=()=>{
+    const co=[...new Set([...(r.collaborators||[]),me])];
+    upd({status:'doing',collaborators:co},'진행중으로 표시 — 참여자에 추가됐습니다');});
   $('qD_ok')&&($('qD_ok').onclick=()=>upd({status:'done',confirmed_at:new Date().toISOString(),confirmed_by:me},'확인 완료'));
   $('qD_back')&&($('qD_back').onclick=()=>{const why=prompt('반려 사유를 적어주세요 (담당자에게 표시됩니다)');if(why==null)return;
     upd({status:'doing',reject_reason:why||'재작업 요청',reported_at:null},'반려 — 담당자에게 재작업 요청');});
@@ -1731,7 +1789,8 @@ function questOpen(id){
 $('qD_close')&&($('qD_close').onclick=()=>$('qDetMask').style.display='none');
 $('qNewBtn')&&($('qNewBtn').onclick=async()=>{
   if(!Q.members.length){const {data}=await sb.from('hs_member').select('user_id,name,team,grade').order('name');Q.members=data||[];}
-  $('qN_assignee').innerHTML=Q.members.filter(m=>m.user_id).map(m=>`<option value="${m.user_id}">${esc(m.name||'')}${m.grade?' · '+esc(m.grade):''}</option>`).join('');
+  const opts=Q.members.filter(m=>m.user_id).map(m=>`<option value="${m.user_id}">${esc(m.name||'')}${m.grade?' · '+esc(m.grade):''}</option>`).join('');
+  $('qN_assignee').innerHTML=opts;$('qN_collab').innerHTML=opts;
   $('qN_title').value='';$('qN_body').value='';$('qN_due').value='';$('qN_prio').value='normal';$('qN_msg').textContent='';
   $('qNewMask').style.display='flex';});
 $('qNewClose')&&($('qNewClose').onclick=()=>$('qNewMask').style.display='none');
@@ -1746,8 +1805,10 @@ $('qN_save')&&($('qN_save').onclick=async()=>{
   if(!ids.length){$('qN_msg').innerHTML='<span style="color:var(--blocked)">담당자를 선택하세요</span>';return;}
   if(!title){$('qN_msg').innerHTML='<span style="color:var(--blocked)">제목을 입력하세요</span>';return;}
   const btn=$('qN_save');btn.disabled=true;
+  const collab=[...$('qN_collab').selectedOptions].map(o=>o.value);
   const rows=ids.map(uid=>({tenant_id:WF_TENANT,module:'hs',title,body:body||null,from_team:'homeshopping',to_team:'homeshopping',
-    assignee_id:uid,status:'open',priority:$('qN_prio').value,due_at:$('qN_due').value?new Date($('qN_due').value+'T23:59:59').toISOString():null,
+    assignee_id:uid,collaborators:collab.filter(c=>c!==uid),status:'open',priority:$('qN_prio').value,
+    due_at:$('qN_due').value?new Date($('qN_due').value+'T23:59:59').toISOString():null,
     created_by:ME&&ME.user_id}));
   const {error}=await sb.from('co_work_request').insert(rows);
   btn.disabled=false;

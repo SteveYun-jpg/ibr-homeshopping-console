@@ -2091,7 +2091,8 @@ const AUDIT_ITEMS=[
   ['ppl','PPL 비용 미입력 (프로그램만 있고 금액 0)','ppl_no_cost'],
   ['brand','정산 브랜드 미분류','brand_null'],
   ['sellout','소비자판매가 미입력 (영업기준이 정산액으로 잡힘)','sellout_missing'],
-  ['dealform','거래유형(직매입/위수탁) 미지정','dealform_missing']
+  ['dealform','거래유형(직매입/위수탁) 미지정','dealform_missing'],
+  ['costmatch','구성↔세트코드 미매칭 (원가율로 계산됨)','cost_unmatched']
 ];
 let AUD={rows:[],cur:null};
 $('auditClose')&&($('auditClose').onclick=()=>$('auditMask').style.display='none');
@@ -3975,7 +3976,7 @@ $('saveBc').onclick=async()=>{const ok=await saveSchedule(true);if(!ok)return;
   await sb.from('hs_broadcast_tick').delete().eq('schedule_id',BC.id);
   if(TICKS.length)await sb.from('hs_broadcast_tick').insert(TICKS.map(t=>({schedule_id:BC.id,tick_at:t.tick_at,calls:t.calls,sales_amt:tickSales(t),memo:t.memo,comp_qtys:t.comp_qtys||{},updated_by:$('who').textContent})));
   {const T=compTotals(),total=T.preAmt+T.onAmt,conv=BC.conv_rate||0.8,costR=(+$('fCost').value||27)/100;
-   if(total>0){const resRow={schedule_id:BC.id,tenant_id:BC.tenant_id||null,gross_sales:total,conversion_rate:conv,pre_order_amount:T.preAmt,cost_amount:Math.round(total*conv*costR),sold_qty:Math.round((T.pre+T.on)||0),updated_by:$('who').textContent};
+   if(total>0){const resRow={schedule_id:BC.id,tenant_id:BC.tenant_id||null,gross_sales:total,conversion_rate:conv,pre_order_amount:T.preAmt,cost_amount:((REAL_COST&&REAL_COST.full_match&&+REAL_COST.real_cost>0)?Math.round(+REAL_COST.real_cost):Math.round(total*conv*costR)),sold_qty:Math.round((T.pre+T.on)||0),updated_by:$('who').textContent};
      const {data:ex}=await sb.from('hs_results').select('id').eq('schedule_id',BC.id).maybeSingle();
      if(ex)await sb.from('hs_results').update(resRow).eq('schedule_id',BC.id);else await sb.from('hs_results').insert(resRow);}}
   COMP_SAVED=(COMPS.length>0);applyLock();applyDraftGate();
@@ -4009,22 +4010,25 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
   const grossConv=Math.round(total*conv),convSale=Math.round(grossConv/vatDiv),pre=Math.round(T.preAmt/vatDiv);
   const sale=total,achieve=tg?Math.round(total/tg*100):0;
   const costR=s.cost_rate??0.27,backR=s.backmargin_rate??0.12,codeR=s.code_fee_rate??0.35;
-  const prodCost=Math.round(convSale*costR),preFee=Math.round(pre*codeR);
+  const useReal=!!(REAL_COST&&REAL_COST.full_match&&+REAL_COST.real_cost>0);
+  const prodCost=useReal?Math.round(+REAL_COST.real_cost):Math.round(convSale*costR),preFee=Math.round(pre*codeR);
+  const costSrc=useReal?('품목원가 · '+(REAL_COST.code_src||'세트코드')):('원가율 '+Math.round(costR*100)+'%');
   const isFix=s.fee_type==='정액',feeBase=isFix?(+s.fee_amount||0):0,rate=+s.commission_rate||0;
   const teuk=Math.round(feeBase*vatFee);   // 정액비 (면세면 VAT포함)
   const pplCost=Math.round((+s.ppl_cost||0)*vatFee);   // PPL비 (면세면 VAT포함)
   const back=isFix?Math.round((convSale-pre)*backR):Math.round((convSale-pre)*rate);
   const backLabel=isFix?`추가수수료 (${Math.round(backR*100)}%)`:`정률수수료 (${Math.round(rate*100)}%)`;
+  const backSub=`(전환매출 − 미리주문) × ${Math.round((isFix?backR:rate)*100)}%`;
   const deduct=prodCost+preFee+teuk+back+pplCost,profit=convSale-deduct,profitR=convSale?Math.round(profit/convSale*100):0;
   const airStr=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${DOW[d.getDay()]}) ${hhmm(d)}${e?' ~ '+hhmm(e):''}`;
   const feeStr=isFix?`정액 ${won(feeBase)}원 (VAT별도)`:`정률 ${Math.round(rate*100)}%`;
-  const info=[['홈쇼핑사',BCH[s.channel_id]||'-'],['방송일시',airStr],['정산구분',feeStr],['프로그램',s.program_name||'-'],['PPL',s.ppl_note||'-'],['세금',taxed?'과세 · VAT 제외 손익':'면세'],['전환율',Math.round(conv*100)+'%'],['원가율',Math.round(costR*100)+'%']];
+  const info=[['홈쇼핑사',BCH[s.channel_id]||'-'],['방송일시',airStr],['정산구분',feeStr],['프로그램',s.program_name||'-'],['PPL',s.ppl_note||'-'],['세금',taxed?'과세 · VAT 제외 손익':'면세'],['전환율',Math.round(conv*100)+'%'],['원가 기준',costSrc]];
   const chip=(l,v)=>`<div style="flex:1 1 150px;min-width:140px;background:#F5F9F7;border:1px solid #E2ECE8;border-radius:10px;padding:8px 11px"><div style="font-size:10.5px;color:#6B8078;font-weight:600;letter-spacing:.02em">${l}</div><div style="font-size:13px;color:#0F2A3F;font-weight:700;margin-top:2px">${v}</div></div>`;
   const summ=(l,v,hi)=>`<div style="flex:1;min-width:96px;text-align:center;background:${hi?'linear-gradient(135deg,#0D9488,#2FAF74)':'#fff'};border:1px solid ${hi?'transparent':'#E2ECE8'};border-radius:11px;padding:11px 8px"><div style="font-size:10.5px;color:${hi?'rgba(255,255,255,.85)':'#6B8078'};font-weight:600">${l}</div><div style="font-size:15px;font-weight:800;color:${hi?'#fff':'#0F2A3F'};margin-top:3px">${v}</div></div>`;
   const drow=(l,v,sub)=>`<tr><td style="padding:9px 14px;border-bottom:1px solid #EEF3F1;color:#33484F;font-weight:600"><span style="color:#C24A4A;font-weight:800;margin-right:6px">−</span>${l}${sub?`<span style="color:#93A5A0;font-weight:500;font-size:11px;margin-left:5px">${sub}</span>`:''}</td><td style="padding:9px 14px;border-bottom:1px solid #EEF3F1;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#C24A4A">-${won(v)}</td></tr>`;
   const vatSub=taxed?'':'VAT포함';
-  let ded=drow('생산원가',prodCost,Math.round(costR*100)+'%')+drow('미리주문 코드수수료',preFee,Math.round(codeR*100)+'%');
-  if(isFix){ded+=drow('특약비',teuk,vatSub)+drow(backLabel,back,'');}else{ded+=drow(backLabel,back,'');}
+  let ded=drow('생산원가',prodCost,costSrc)+drow('미리주문 코드수수료',preFee,'미리주문 × '+Math.round(codeR*100)+'%');
+  if(isFix){ded+=drow('특약비',teuk,vatSub)+drow(backLabel,back,backSub);}else{ded+=drow(backLabel,back,backSub);}
   if(pplCost>0)ded+=drow('PPL비',pplCost,vatSub);
   const html=`<div id="settleCanvas" style="background:#fff;width:600px;font-family:'Pretendard',sans-serif;color:#0F2A3F">
     <div style="background:linear-gradient(135deg,#0D9488,#2FAF74);padding:18px 22px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between">
@@ -4046,15 +4050,20 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
         <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9)">최종 손익 <span style="font-weight:500;font-size:11px">· 손익률 ${profitR}%</span></span>
         <span style="font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums">${won(profit)}<span style="font-size:13px;font-weight:600;margin-left:2px">원</span></span>
       </div>
-      <div style="margin-top:12px;font-size:10.5px;color:#93A5A0;line-height:1.6">※ 방송직후 잠정 손익 · 반품/확정 전 · 전환율 ${Math.round(conv*100)}% · 원가율 ${Math.round(costR*100)}% 적용 · ${taxed?'과세 상품이라 매출은 VAT 제외(공급가) 기준':'면세 상품 — 매입세액 공제 불가라 정액비·PPL비는 VAT포함으로 차감'} · VAT 현금흐름은 별도<br>작성 ${new Date().toLocaleDateString('ko-KR')} · IBR COMMERCE 홈쇼핑팀</div>
+      <div style="margin-top:12px;font-size:10.5px;color:#93A5A0;line-height:1.6">※ 방송직후 잠정 손익 · 반품/확정 전 · 전환율 ${Math.round(conv*100)}% · 원가 ${costSrc}${useReal?'':' (구성↔세트코드 매칭이 없어 원가율로 계산됨)'} · ${taxed?'과세 상품이라 매출은 VAT 제외(공급가) 기준':'면세 상품 — 매입세액 공제 불가라 정액비·PPL비는 VAT포함으로 차감'} · VAT 현금흐름은 별도<br>작성 ${new Date().toLocaleDateString('ko-KR')} · IBR COMMERCE 홈쇼핑팀</div>
     </div>
   </div>`;
   $('settleCard').innerHTML=html;$('settleMask').style.display='flex';}
-$('genSettle').onclick=showSettle;
+$('genSettle').onclick=async()=>{if(BC&&BC.id)await loadRealCost(BC.id);showSettle();};
 async function openSettleReport(id){if(!id)return;
   const {data:s}=await sb.from('hs_schedules').select('*').eq('id',id).single();if(!s){toast('편성을 찾을 수 없음','err');return;}
   const {data:c}=await sb.from('hs_broadcast_comp').select('*').eq('schedule_id',id).order('seq');
-  BC=s;COMPS=c||[];showSettle();}
+  BC=s;COMPS=c||[];await loadRealCost(id);showSettle();}
+// 구성 → 세트코드 → 품목/BOM 원가 (없으면 원가율 폴백)
+let REAL_COST=null;
+async function loadRealCost(id){REAL_COST=null;if(!id)return;
+  const {data}=await sb.from('hs_v_schedule_cost').select('*').eq('schedule_id',id).maybeSingle();
+  if(data&&data.full_match&&+data.real_cost>0)REAL_COST=data;else if(data)REAL_COST={...data,full_match:false};}
 $('closeSettle').onclick=()=>$('settleMask').style.display='none';
 $('copyImgSettle').onclick=async()=>{const node=$('settleCanvas');if(!node){toast('정산서가 없습니다','err');return;}
   try{const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff'});

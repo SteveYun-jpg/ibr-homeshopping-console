@@ -161,6 +161,8 @@ body.collapsed .sideuser{justify-content:center;padding:11px 0 4px}
 .btn:hover{border-color:var(--brand)}.btn.primary{background:var(--brand-grad);border:none;color:#fff}.btn.ghost{background:transparent}.btn.sm{padding:6px 11px;font-size:12.5px}
 main{padding:22px 30px 36px;width:100%}
 /* 워크플로우는 글로벌소싱 콘솔처럼 화면을 꽉 채운다 — main 여백 상쇄 + 뷰포트 높이 */
+/* 외부에서 로드되는 공유 모듈 CSS(.suwf{display:flex} 등)가 뷰 숨김을 덮어쓰지 않도록 고정 */
+.view:not(.active){display:none!important}
 main:has(> #v-workflow.active),body.wf-full main{padding:0;height:100vh;display:flex;flex-direction:column}
 body.wf-full #qBanner,main:has(> #v-workflow.active) #qBanner,main:has(> #v-quest.active) #qBanner{display:none!important}
 #v-workflow.active{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 18px 16px;box-sizing:border-box}
@@ -313,15 +315,15 @@ tbody tr:hover{background:var(--bg1)}
     </div>
     <div class="navgroup">
       <div class="gl">업무</div>
-      <div class="nav" data-v="quest" data-t="업무 지시"><span class="lb">✅ 업무 지시</span><span id="qNavBadge" style="display:none;background:#E11D48;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:6px"></span></div>
-      <div class="nav" data-v="survey" data-t="의견 설문"><span class="lb">📝 의견 설문</span></div>
+      <div class="nav" data-v="quest" data-t="업무 지시"><span class="lb">업무 지시</span><span id="qNavBadge" style="display:none;background:#E11D48;color:#fff;border-radius:9px;padding:0 6px;font-size:10px;font-weight:700;margin-left:6px"></span></div>
+      <div class="nav" data-v="survey" data-t="의견 설문"><span class="lb">의견 설문</span></div>
     </div>
     <div class="navgroup" id="memberNav" style="display:none">
       <div class="gl">관리자</div>
       <div class="nav" data-v="members" data-t="직원 관리"><span class="lb">직원 관리</span></div>
     </div>
     <div class="devreq" id="reqSideBtn" title="개발요청"><span class="lbx">개발요청</span></div>
-    <div class="devreq" id="noticeSideBtn" title="업데이트 공지 다시 보기" style="margin-top:6px"><span class="lbx">📣 업데이트</span></div>
+    <div class="devreq" id="noticeSideBtn" title="업데이트 공지 다시 보기" style="margin-top:6px"><span class="lbx">업데이트</span></div>
     <div class="refbadges" id="refBadges">
       <div class="rb big" data-v="channels" title="홈쇼핑사">H</div>
       <div class="rb big" data-v="brands" title="브랜드">B</div>
@@ -1189,6 +1191,7 @@ function navTo(v,push){if(push===undefined)push=true;
   document.querySelectorAll('.nav[data-v],.rb[data-v]').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   const navEl=document.querySelector('.nav[data-v="'+v+'"]')||document.querySelector('.rb[data-v="'+v+'"]');if(navEl)navEl.classList.add('active');
+  if(v==='workflow'&&typeof wfAllowed==='function'&&!wfAllowed())v='home';   // 준비 중 — 허용 계정만
   const view=$('v-'+v);if(view)view.classList.add('active');
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
   if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();
@@ -1356,6 +1359,7 @@ function applyMemberGate(){
   const mb=$('memberNav');if(mb)mb.style.display=isAdmin()?'':'none';
   // 워크플로우: 준비 중이라 대표 계정에서만 노출 (팀원 혼선 방지)
   const wn=$('wfNav');if(wn)wn.style.display=wfAllowed()?'':'none';
+  if(!wfAllowed()){const wv=$('v-workflow');if(wv)wv.remove();}   // 직원 화면에는 흔적도 남기지 않는다
   if(AUTHED&&ok)questPing();
 }
 // 로그인 시 업무 지시 알림 (배지 + 배너)
@@ -1797,7 +1801,7 @@ $('qNewClose')&&($('qNewClose').onclick=()=>$('qNewMask').style.display='none');
 function qKakaoText(){
   const t=$('qN_title').value.trim(),b=$('qN_body').value.trim(),d=$('qN_due').value;
   const who=[...$('qN_assignee').selectedOptions].map(o=>o.textContent.split(' · ')[0]).join(', ');
-  return `[업무 지시] ${t}\n담당: ${who}${d?`\n기한: ${d}`:''}\n\n${b}\n\n콘솔 → 왼쪽 메뉴 「✅ 업무 지시」에서 확인하고, 끝나면 완료 보고 눌러주세요.\nhttps://ibr-homeshopping-console.netlify.app/#quest`;}
+  return `[업무 지시] ${t}\n담당: ${who}${d?`\n기한: ${d}`:''}\n\n${b}\n\n콘솔 → 왼쪽 메뉴 「업무 지시」에서 확인하고, 끝나면 완료 보고 눌러주세요.\nhttps://ibr-homeshopping-console.netlify.app/#quest`;}
 $('qN_copy')&&($('qN_copy').onclick=async()=>{try{await navigator.clipboard.writeText(qKakaoText());toast('카톡 문구 복사됨','ok');}catch(_){prompt('복사',qKakaoText());}});
 $('qN_save')&&($('qN_save').onclick=async()=>{
   const ids=[...$('qN_assignee').selectedOptions].map(o=>o.value);

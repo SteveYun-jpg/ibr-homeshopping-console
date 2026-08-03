@@ -431,7 +431,7 @@ tbody tr:hover{background:var(--bg1)}
               <div><label>순매출목표 <span class="muted" style="font-weight:400;font-size:10.5px">주문매출 × 전환율 · 자동</span></label>
                 <input type="text" inputmode="numeric" id="fNet" readonly title="주문매출목표와 전환율로 자동 계산됩니다" style="background:var(--bg1);color:var(--ink2)"></div>
               <div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
-            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
+            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox" style="display:none"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
             <div class="row3"><div><label>차수 <span class="muted" style="font-weight:400;font-size:10.5px">브랜드·라인 기준 자동 · 수정 가능</span></label><input id="fProg" placeholder="예: 3차"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:13px"><div><label>쇼호스트</label><input id="fHost" placeholder="쇼호스트명"></div><div><label>PD</label><input id="fPd" placeholder="PD명"></div><div><label>담당 MD</label><input id="fMd" list="gsmd" placeholder="MD명"><datalist id="gsmd"><option>박민주 부장</option><option>장효석 이사</option><option>민정현 주임</option><option>한수진 과장</option><option>빅토리아 이사(외부)</option></datalist></div><div><label>색상</label><input type="color" id="fColor" value="#0D9488" style="width:48px;height:38px;padding:2px;border:1px solid var(--line1);border-radius:9px;cursor:pointer"></div></div>
             <label style="font-size:11.5px;color:var(--ink3);display:block;margin:4px 0 4px">사후미팅 메모</label>
@@ -1382,6 +1382,28 @@ async function questPing(){
   else bn.style.display='none';
   questNotice(boss?rows.filter(r=>r.status==='reported'):mine, boss, over);
 }
+// 구성 판매가 입력 진행률 — 지시가 끝날 때까지 접속할 때마다 남은 항목을 보여준다
+async function presetProgress(){
+  const box=$('qNoticeBody');if(!box)return;
+  const {data,error}=await sb.from('hs_v_preset_progress').select('*');
+  if(error||!data||!data.length)return;
+  const done=data.filter(r=>r.done).length,total=data.length,left=data.filter(r=>!r.done);
+  if(!left.length)return;                       // 다 채워지면 더 이상 띄우지 않는다
+  const pct=Math.round(done/total*100);
+  const el=document.createElement('div');
+  el.style.cssText='border:1px solid #F5D98B;background:#FFF8E6;border-radius:11px;padding:12px 14px;margin-top:4px';
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+      <b style="font-size:12.5px">구성 판매가 입력 진행률</b>
+      <span class="chip" style="background:#fff;color:#B45309">${done}/${total} 라인 (${pct}%)</span></div>
+    <div style="height:6px;background:#F0E2C0;border-radius:4px;overflow:hidden;margin-bottom:8px">
+      <div style="height:100%;width:${pct}%;background:#F59E0B"></div></div>
+    <div style="font-size:11.5px;line-height:1.7">${left.slice(0,10).map(r=>
+      `· ${esc(r.brand)} / ${esc(r.line)} — ${r.presets===0?'<span style="color:#B91C1C">구성 없음</span>'
+        :`구성 ${r.presets}개 중 판매가 <b>${r.priced}</b>개 입력`}`).join('<br>')}
+      ${left.length>10?`<br><span class="muted">…외 ${left.length-10}개</span>`:''}</div>
+    <div class="muted" style="font-size:11px;margin-top:7px">라인·세트 구성 › 세트 구성 탭에서 입력하면 이 목록에서 사라집니다.</div>`;
+  box.appendChild(el);
+}
 // 접속하면 공지처럼 먼저 띄운다 (기한 초과가 있으면 '오늘 안 보기'와 무관하게 항상)
 function questNotice(list,boss,over){
   const mask=$('qNoticeMask');if(!mask||!list||!list.length)return;
@@ -1406,6 +1428,7 @@ function questNotice(list,boss,over){
       ${r.due_at?`<div class="muted" style="font-size:11px;margin-top:5px">기한 ${esc(String(r.due_at).slice(0,10))}</div>`:''}
     </div>`;}).join('')
     +(list.length>8?`<div class="muted" style="font-size:11.5px">…외 ${list.length-8}건</div>`:'');
+  presetProgress();   // 구성 판매가 진행률을 공지 안에서 실시간으로 보여준다
   const close=()=>{ if($('qNoticeMute').checked){try{localStorage.setItem('hsQNotice',sig);}catch(_){}} mask.style.display='none'; };
   $('qNoticeLater').onclick=close;
   $('qNoticeGo').onclick=()=>{close();navTo('quest');};
@@ -3213,7 +3236,7 @@ function setDealSeg(v){v=v||'자사';document.querySelectorAll('#fDealSeg button
   const agy=(v==='대행');
   // 대행은 물건을 사지 않으므로 원가율이 성립하지 않는다 → 숨기고, 대신 '우리가 받는 대행수수료'를 받는다.
   // ※ fRate(수수료율)는 홈쇼핑사가 떼가는 판매수수료(12~49%)로 대행수수료(3~7%)와 다른 값이다.
-  {const cb=$('fCostBox');if(cb)cb.style.display=agy?'none':'';}
+  {const cb=$('fCostBox');if(cb)cb.style.display='none';}   // 원가율은 화면에서 다루지 않는다(정산 폴백용으로만 보관)
   {const ab=$('fAgencyBox');if(ab)ab.style.display=agy?'':'none';}
   if(agy){$('fRateBox').style.display='';$('fFixedBox').style.display=(getFeeSeg()==='정률')?'none':'';applyAgencyFee();}
   else{setFeeSeg(getFeeSeg());}
@@ -3944,7 +3967,7 @@ function bcMissingHard(){return BC_HARD.filter(([id])=>fldEmpty(id)).map(([,l])=
 function bcMissing(){const m=[];BC_REQ.forEach(([id,l])=>{if(fldEmpty(id))m.push(l);});
   const lt=$('fLineTop');if(lt&&lt.options.length>1&&!lt.value)m.push('라인');
   const dealAgy=getDealSeg()==='대행',fee=getFeeSeg();
-  if(!dealAgy&&fldEmpty('fCost'))m.push('원가율');
+
   if(!dealAgy&&fee==='정액'&&fldEmpty('fFixed'))m.push('특약비');
   if((dealAgy||fee==='정률')&&fldEmpty('fRate'))m.push('수수료율');
   if(dealAgy&&fldEmpty('fAgency'))m.push('대행수수료');
@@ -4033,12 +4056,16 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
   const deduct=prodCost+preFee+teuk+back+pplCost,profit=convSale-deduct,profitR=convSale?Math.round(profit/convSale*100):0;
   const airStr=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${DOW[d.getDay()]}) ${hhmm(d)}${e?' ~ '+hhmm(e):''}`;
   const feeStr=isFix?`정액 ${won(feeBase)}원 (VAT별도)`:`정률 ${Math.round(rate*100)}%`;
-  const info=[['홈쇼핑사',BCH[s.channel_id]||'-'],['방송일시',airStr],['정산구분',feeStr],['프로그램',s.program_name||'-'],['PPL',s.ppl_note||'-'],['세금',taxed?'과세 · VAT 제외 손익':'면세'],['전환율',Math.round(conv*100)+'%'],['원가 기준',costSrc]];
+  const info=[['홈쇼핑사',BCH[s.channel_id]||'-'],['방송일시',airStr],['정산구분',feeStr],['프로그램',s.program_name||'-'],['PPL',s.ppl_note||'-'],['세금',taxed?'과세 · VAT 제외 손익':'면세'],['전환율',Math.round(conv*100)+'%'],
+    ['원가율 (주문매출 대비)',(total?(prodCost/total*100).toFixed(1):'0.0')+'%'],
+    ['원가율 (전환매출 대비)',(convSale?(prodCost/convSale*100).toFixed(1):'0.0')+'%']];
   const chip=(l,v)=>`<div style="flex:1 1 150px;min-width:140px;background:#F5F9F7;border:1px solid #E2ECE8;border-radius:10px;padding:8px 11px"><div style="font-size:10.5px;color:#6B8078;font-weight:600;letter-spacing:.02em">${l}</div><div style="font-size:13px;color:#0F2A3F;font-weight:700;margin-top:2px">${v}</div></div>`;
   const summ=(l,v,hi)=>`<div style="flex:1;min-width:96px;text-align:center;background:${hi?'linear-gradient(135deg,#0D9488,#2FAF74)':'#fff'};border:1px solid ${hi?'transparent':'#E2ECE8'};border-radius:11px;padding:11px 8px"><div style="font-size:10.5px;color:${hi?'rgba(255,255,255,.85)':'#6B8078'};font-weight:600">${l}</div><div style="font-size:15px;font-weight:800;color:${hi?'#fff':'#0F2A3F'};margin-top:3px">${v}</div></div>`;
   const drow=(l,v,sub)=>`<tr><td style="padding:9px 14px;border-bottom:1px solid #EEF3F1;color:#33484F;font-weight:600"><span style="color:#C24A4A;font-weight:800;margin-right:6px">−</span>${l}${sub?`<span style="color:#93A5A0;font-weight:500;font-size:11px;margin-left:5px">${sub}</span>`:''}</td><td style="padding:9px 14px;border-bottom:1px solid #EEF3F1;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#C24A4A">-${won(v)}</td></tr>`;
   const vatSub=taxed?'':'VAT포함';
-  let ded=drow('생산원가',prodCost,costSrc)+drow('미리주문 코드수수료',preFee,'미리주문 × '+Math.round(codeR*100)+'%');
+  const costPctOrder=total?(prodCost/total*100).toFixed(1):'0.0';
+  let ded=drow('생산원가',prodCost,`주문매출 대비 ${costPctOrder}% · ${costSrc}`)
+        +drow('미리주문 코드수수료',preFee,'미리주문 × '+Math.round(codeR*100)+'%');
   if(isFix){ded+=drow('특약비',teuk,vatSub)+drow(backLabel,back,backSub);}else{ded+=drow(backLabel,back,backSub);}
   if(pplCost>0)ded+=drow('PPL비',pplCost,vatSub);
   const html=`<div id="settleCanvas" style="background:#fff;width:600px;font-family:'Pretendard',sans-serif;color:#0F2A3F">
@@ -4061,7 +4088,7 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
         <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9)">최종 손익 <span style="font-weight:500;font-size:11px">· 손익률 ${profitR}%</span></span>
         <span style="font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums">${won(profit)}<span style="font-size:13px;font-weight:600;margin-left:2px">원</span></span>
       </div>
-      <div style="margin-top:12px;font-size:10.5px;color:#93A5A0;line-height:1.6">※ 방송직후 잠정 손익 · 반품/확정 전 · 전환율 ${Math.round(conv*100)}% · 원가 ${costSrc}${useReal?'':' (구성↔세트코드 매칭이 없어 원가율로 계산됨)'} · ${taxed?'과세 상품이라 매출은 VAT 제외(공급가) 기준':'면세 상품 — 매입세액 공제 불가라 정액비·PPL비는 VAT포함으로 차감'} · VAT 현금흐름은 별도<br>작성 ${new Date().toLocaleDateString('ko-KR')} · IBR COMMERCE 홈쇼핑팀</div>
+      <div style="margin-top:12px;font-size:10.5px;color:#93A5A0;line-height:1.6">※ 방송직후 잠정 손익 · 반품/확정 전 · 전환율 ${Math.round(conv*100)}% · 원가 ${costSrc} — 고객 주문매출 ${won(total)}원 대비 ${costPctOrder}%${useReal?'':' (구성↔세트코드 매칭이 없어 원가율로 계산됨)'} · ${taxed?'과세 상품이라 매출은 VAT 제외(공급가) 기준':'면세 상품 — 매입세액 공제 불가라 정액비·PPL비는 VAT포함으로 차감'} · VAT 현금흐름은 별도<br>작성 ${new Date().toLocaleDateString('ko-KR')} · IBR COMMERCE 홈쇼핑팀</div>
     </div>
   </div>`;
   $('settleCard').innerHTML=html;$('settleMask').style.display='flex';}

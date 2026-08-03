@@ -278,7 +278,70 @@ tbody tr:hover{background:var(--bg1)}
 .modal h3{margin:0 0 6px;font-size:17px;color:var(--ink1)}.modal p{margin:0 0 18px;color:var(--ink3);font-size:13px;line-height:1.6}
 .modal .msg{margin-top:12px;font-size:12.5px;color:var(--brand-ink)}.modal .msg.err{color:var(--blocked)}
 .muted{color:var(--ink3);font-size:12.5px}
-@media(max-width:760px){.sidebar{position:fixed;z-index:40;left:0}body:not(.collapsed) .sidebar{width:226px}body.collapsed .sidebar{transform:translateX(-100%)}}
+/* ===== 모바일 (≤760px) ===== */
+#mtop{display:none}
+@media(max-width:760px){
+  /* 가로 스크롤 봉인 — 표는 표 안에서만 좌우로 움직인다 */
+  html,body{overflow-x:hidden;max-width:100%}
+  .app{display:block;min-height:100vh}
+  .content{display:block;min-width:0;max-width:100vw;overflow-x:hidden}
+  main{padding:calc(52px + 12px) 14px 84px;width:auto;min-width:0;max-width:100vw;overflow-x:hidden}
+  .card,.view,.kpis,.sechead{min-width:0;max-width:100%}
+  .card{padding:14px;border-radius:12px;margin-bottom:12px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+
+  /* 상단 고정 바 — 모바일에서 메뉴로 들어가는 유일한 입구 */
+  #mtop{display:flex;position:fixed;top:0;left:0;right:0;height:52px;z-index:45;
+    background:var(--side);color:#fff;align-items:center;gap:10px;padding:0 12px;
+    box-shadow:0 2px 10px rgba(15,42,63,.18)}
+  #mtopBtn{width:38px;height:38px;flex:0 0 38px;border:0;background:rgba(255,255,255,.12);color:#fff;
+    border-radius:10px;font-size:17px;line-height:1;cursor:pointer}
+  #mtopTitle{font-size:14.5px;font-weight:800;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #mtopWho{width:32px;height:32px;flex:0 0 32px;border-radius:50%;background:var(--brand);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;cursor:pointer}
+
+  /* 사이드바 = 서랍 + 딤 */
+  .sidebar{position:fixed;z-index:47;left:0;top:0;height:100vh;width:270px;flex-basis:270px;
+    transform:translateX(-100%);transition:transform .22s ease}
+  body.navopen .sidebar{transform:translateX(0)}
+  body.navopen::after{content:"";position:fixed;inset:0;background:rgba(15,42,63,.45);z-index:46}
+  .sidebar .nav,.sidebar .devreq{padding:11px 12px;font-size:14px}
+  .sidebar .gl{font-size:11px}
+  #collapseBtn{display:none}
+
+  /* 손가락으로 누를 수 있는 크기 · iOS 입력 확대 방지 */
+  input,select,textarea{font-size:16px!important;min-height:42px}
+  input[type=checkbox],input[type=radio]{min-height:0}
+  .btn{min-height:40px;padding:9px 14px}
+  .toolbar,.seg{flex-wrap:wrap;max-width:100%}
+  .seg button{flex:1 1 auto;min-width:74px}
+
+  /* 폼은 한 줄에 하나 */
+  .row2,.row3,.row4,.grid2{grid-template-columns:1fr!important}
+
+  /* KPI는 2열 — 세로로 끝없이 늘어지지 않게 */
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:12px}
+  .kpi{padding:11px 12px}.kpi .v{font-size:17px}.kpi .l{font-size:10.5px}
+
+  /* 표 — 첫 열 고정 + 좌우 스크롤 */
+  table{font-size:12px}
+  th,td{padding:8px 8px}
+  th:first-child,td:first-child{position:sticky;left:0;background:var(--surface);z-index:1}
+  thead th{position:sticky;top:0;background:var(--bg1);z-index:2}
+  thead th:first-child{z-index:3}
+
+  .sechead{flex-wrap:wrap;gap:6px}
+  .sec{font-size:17px}
+  h3{font-size:14px}
+  .modal{max-width:100%;width:100%;border-radius:14px;padding:18px;max-height:88vh;overflow:auto}
+  .mask{padding:10px!important;align-items:flex-end!important}
+  #qBanner{flex-wrap:wrap}
+  .refbadges{flex-wrap:wrap}
+}
+@media(max-width:400px){
+  .kpis{grid-template-columns:1fr}
+  main{padding-left:11px;padding-right:11px}
+}
 </style>
 </head>
 <body>
@@ -295,6 +358,11 @@ tbody tr:hover{background:var(--bg1)}
   </div>
 </div>
 <div class="app hidden" id="app">
+  <div id="mtop">
+    <button id="mtopBtn" aria-label="메뉴">☰</button>
+    <div id="mtopTitle">대시보드</div>
+    <div id="mtopWho">·</div>
+  </div>
   <aside class="sidebar" id="sidebar">
     <div class="sidelogo" id="logo" title="홈"><div class="mark">IBR</div><div class="tx"><b>IBR COMMERCE</b><small>홈쇼핑팀</small></div><button class="sideToggle" id="collapseBtn" title="사이드바 숨기기 / 펼치기"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9.5" y1="4" x2="9.5" y2="20"/></svg></button></div>
     <div class="navgroup">
@@ -1204,7 +1272,9 @@ function navTo(v,push){if(push===undefined)push=true;
   if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   document.body.classList.toggle('wf-full',v==='workflow');   // 워크플로우는 여백 없이 꽉 채움
-  if(window.innerWidth<760)document.body.classList.add('collapsed');
+  if(typeof syncMobileTop==='function')syncMobileTop(v);
+  if(typeof navDrawer==='function')navDrawer(false);
+  if(window.innerWidth<760){document.body.classList.add('collapsed');window.scrollTo(0,0);}
   scrollTo({top:0,behavior:'smooth'});
   if(push)pushView(v);
 }
@@ -4646,6 +4716,25 @@ $('noticeClose')&&($('noticeClose').onclick=async()=>{
   $('noticeMask').style.display='none';});
 $('noticeSideBtn')&&($('noticeSideBtn').onclick=async()=>{const n=await loadLatestNotice();if(n)renderNotice(n);else toast('공지가 없습니다','warn');});
 
+// ===== 모바일: 서랍 메뉴 · 상단바 =====
+const isMobile=()=>window.matchMedia('(max-width:760px)').matches;
+function navDrawer(open){document.body.classList.toggle('navopen',open===undefined?!document.body.classList.contains('navopen'):!!open);}
+$('mtopBtn')&&($('mtopBtn').onclick=e=>{e.stopPropagation();navDrawer();});
+$('mtopWho')&&($('mtopWho').onclick=e=>{e.stopPropagation();navDrawer(true);const t=$('userTrigger');if(t)setTimeout(()=>t.click(),250);});
+// 딤(::after)·본문 아무 곳이나 누르면 닫힘 · 메뉴 고르면 닫힘
+document.addEventListener('click',e=>{
+  if(!document.body.classList.contains('navopen'))return;
+  if(e.target.closest('#sidebar')){ if(e.target.closest('.nav,.rb,.devreq'))navDrawer(false); return; }
+  if(e.target.closest('#mtopBtn'))return;
+  navDrawer(false);
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')navDrawer(false);});
+function syncMobileTop(v){
+  const t=$('mtopTitle');if(!t)return;
+  const el=document.querySelector('.nav[data-v="'+v+'"],.rb[data-v="'+v+'"]');
+  t.textContent=(el&&(el.dataset.t||el.textContent.trim()))||'대시보드';
+  const a=$('mtopWho'),av=$('avatar');if(a&&av)a.textContent=av.textContent||'·';
+}
 // boot
 refreshAuth().then(async()=>{
   const h=parseHash();                                   // 새로고침 시 보던 화면 복원

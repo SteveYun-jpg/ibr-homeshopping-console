@@ -779,7 +779,7 @@ tbody tr:hover{background:var(--bg1)}
               <div><label>홈사 <span class="muted" style="font-weight:400;font-size:10px">기본=전체 공통</span></label><select id="pcChannel"><option value="">기본 (전체 홈사)</option></select></div>
             </div>
             <div style="margin-bottom:8px"><span class="muted" id="pbStatus" style="font-size:11.5px"></span></div>
-            <div class="scroll"><table id="presetTbl"><thead><tr><th class="l">구성(프리셋)</th><th class="l">세트/단품 코드 매칭</th><th>판매가</th><th>원가</th><th>사용</th><th></th></tr></thead><tbody id="presetBody"><tr><td class="state" colspan="6">브랜드·라인을 선택하세요</td></tr></tbody></table></div>
+            <div class="scroll"><table id="presetTbl"><thead><tr><th class="l">구성(프리셋)</th><th class="l">세트/단품 코드 매칭</th><th>판매가 <span class="muted" style="font-weight:400;font-size:10px">방송 편성에 그대로 적용</span></th><th>적용가 · 출처</th><th>사용</th><th></th></tr></thead><tbody id="presetBody"><tr><td class="state" colspan="6">브랜드·라인을 선택하세요</td></tr></tbody></table></div>
             <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
               <button class="btn sm" id="presetAddTier">+ 구성 추가</button>
               <span class="muted" style="font-size:11px">단품/싱글/더블/패밀리/메가 외에도 자유롭게 추가</span>
@@ -1697,6 +1697,8 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
 const Q_STATUS={open:['지시','#F59E0B','#FEF3C7'],doing:['진행중','#3B82F6','#E0F2FE'],reported:['보고 완료 · 확인대기','#0D9488','#D6F5EC'],done:['확인 완료','#10B981','#D1FAE5'],canceled:['취소','#94A3B8','var(--bg2)']};
 const Q_PRIO={urgent:['긴급','#DC2626'],high:['높음','#B45309'],normal:['보통','var(--ink3)'],low:['낮음','var(--ink4)']};
 let Q={rows:[],members:[],tab:'todo',cur:null};
+// 원가 열람 권한 — 대표·임원·경영진·관리자만. 나머지는 원가 대신 판매가 기준으로 일한다.
+function canSeeCost(){return !!(ME&&(ME.is_admin||ME.grade==='임원'||ME.grade==='경영진'));}
 function qMine(r){const me=ME&&ME.user_id;return r.assignee_id===me||(r.collaborators||[]).includes(me);}
 function qIsBoss(){return !!(ME&&(ME.is_admin||ME.grade==='임원'||ME.grade==='경영진'));}
 function qBadge(s){const v=Q_STATUS[s]||Q_STATUS.open;return `<span class="chip" style="background:${v[2]};color:${v[1]}">${v[0]}</span>`;}
@@ -2955,19 +2957,24 @@ async function loadHubData(){const b=HUB_BRAND;
     .sort((a,z)=>(a.item_name||'').localeCompare(z.item_name||'','ko'));
   HUB_DIRTY={};
   const withCost=HUB_ROWS.filter(r=>r.auto_cost!=null).length;
-  $('hubStatus').innerHTML=`세트코드 <b>${HUB_ROWS.length}</b>개 · 원가있음 <b style="color:var(--ok)">${withCost}</b> · <span style="color:var(--gold)">원가없음 ${HUB_ROWS.length-withCost}</span>`;
+  $('hubStatus').innerHTML=canSeeCost()
+    ? `세트코드 <b>${HUB_ROWS.length}</b>개 · 원가있음 <b style="color:var(--ok)">${withCost}</b> · <span style="color:var(--gold)">원가없음 ${HUB_ROWS.length-withCost}</span>`
+    : `세트코드 <b>${HUB_ROWS.length}</b>개 · 원가는 대표·임원만 열람합니다`;
   renderHub();}
 function renderHub(){const q=($('hubSearch').value||'').trim().toLowerCase();
   const view=HUB_ROWS.filter(r=>!q||(r.set_code||'').toLowerCase().includes(q)||(r._std||'').toLowerCase().includes(q)||(r.item_name||'').toLowerCase().includes(q));
-  tbl('t_hub',[
+  const cols=[
     {h:'세트코드',l:1,f:r=>`<span class="muted" style="font-size:10.5px">${esc(r.set_code)}</span>`},
     {h:'BOM 품목명',l:1,f:r=>`<span title="${esc(r.item_name||'')}">${esc((r.item_name||'').slice(0,32))}</span>`},
-    {h:'표준 품목명 <span class="muted" style="font-weight:400">(정산표기)</span>',l:1,f:r=>`<input class="cell2" style="min-width:190px;text-align:left" data-sc="${esc(r.set_code)}" data-f="std_name" value="${esc(r.std_name||'')}" placeholder="${esc(r.item_name||'')}">`},
+    {h:'표준 품목명 <span class="muted" style="font-weight:400">(정산표기)</span>',l:1,f:r=>`<input class="cell2" style="min-width:190px;text-align:left" data-sc="${esc(r.set_code)}" data-f="std_name" value="${esc(r.std_name||'')}" placeholder="${esc(r.item_name||'')}">`}];
+  if(canSeeCost())cols.push(
     {h:'원가(자동)',f:r=>r.auto_cost!=null?`<b style="font-variant-numeric:tabular-nums">${won(r.auto_cost)}</b>`:'<span class="muted">없음</span>'},
-    {h:'수기원가(폴백)',f:r=>`<input class="cell2" type="number" data-sc="${esc(r.set_code)}" data-f="manual_cost" value="${r.manual_cost!=null?r.manual_cost:''}" placeholder="—">`},
+    {h:'수기원가(폴백)',f:r=>`<input class="cell2" type="number" data-sc="${esc(r.set_code)}" data-f="manual_cost" value="${r.manual_cost!=null?r.manual_cost:''}" placeholder="—">`});
+  else cols.push({h:'원가',f:()=>'<span class="muted" title="원가는 대표·임원만 열람합니다">🔒</span>',flt:false});
+  cols.push(
     {h:'편성 구성',l:1,f:r=>r.presets.length?r.presets.map(p=>`<span class="chip" style="background:var(--brand-soft);color:var(--brand-ink);margin-right:3px">${esc(p)}</span>`).join(''):'<span class="muted">–</span>'},
-    {h:'정산 별칭',f:r=>`<button class="btn sm hubAlias" data-sc="${esc(r.set_code)}" style="padding:2px 9px">${r.aliasN?`${r.aliasN}건`:'붙이기'} ▸</button>`}
-  ],view,'세트코드가 없습니다');
+    {h:'정산 별칭',f:r=>`<button class="btn sm hubAlias" data-sc="${esc(r.set_code)}" style="padding:2px 9px">${r.aliasN?`${r.aliasN}건`:'붙이기'} ▸</button>`});
+  tbl('t_hub',cols,view,'세트코드가 없습니다');
   $('t_hub').querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{
     const sc=el.dataset.sc,f=el.dataset.f;(HUB_DIRTY[sc]=HUB_DIRTY[sc]||{})[f]=el.value===''?null:el.value;
     const row=HUB_ROWS.find(x=>x.set_code===sc);if(row)row[f]=(f==='manual_cost'?(el.value===''?null:+el.value):el.value);}));
@@ -3344,23 +3351,27 @@ async function loadPresetGrid(){
   if(mapped) msg=`${scope} · <span style="color:var(--ok)">구성 ${mapped}개 저장됨</span>`;
   else if(channel) msg=`${scope} · <span class="muted">예외 없음 — "+ 구성 추가"로 만들면 이 홈사만 별도 적용 (없으면 기본이 적용됨)</span>`;
   else msg=`${scope} · <span style="color:var(--gold)">구성 없음 — "+ 구성 추가"로 시작</span>`;
+  msg+=' <span class="muted">· 판매가는 여기서 정한 값이 방송 편성 구성에 그대로 들어갑니다(비우면 SKU 판매가 자동).</span>';
   $('pbStatus').innerHTML=msg;
 }
 function presetSetOptions(sel){
   const {brand,line}=PSTATE;const sets=PICKP.filter(p=>p.brand===brand&&p.line===line);
   return '<option value="">— 없음 (판매가만 등록 · 대행 등) —</option>'+sets.map(s=>{
-    const c=PCOST[s.code]!=null?` · 원가 ${won(PCOST[s.code])}`:' · 원가없음';
-    return `<option value="${esc(s.code)}" ${s.code===sel?'selected':''}>[${s.kind}] ${esc((s.name||'').slice(0,42))}${c}</option>`;}).join('');
+    const pr=s.price!=null?` · SKU가 ${won(s.price)}`:'';
+    return `<option value="${esc(s.code)}" ${s.code===sel?'selected':''}>[${s.kind}] ${esc((s.name||'').slice(0,42))}${pr}</option>`;}).join('');
 }
 function renderPresetGrid(){
   const b=PSTATE.brand;
   $('presetBody').innerHTML=(PSTATE.rows.length?PSTATE.rows.map((r,i)=>{
-    const cost=r.set_code?PCOST[r.set_code]:null;
+    const sku=r.set_code?((PICKP.find(x=>x.code===r.set_code)||{}).price):null;   // SKU 탭에 등록된 판매가
+    const eff=r.price!=null?+r.price:(sku!=null?+sku:null);
+    const src=r.price!=null?'<span style="color:var(--ok);font-weight:700">직접 입력</span>'
+             :(sku!=null?'<span class="muted">SKU 판매가 자동</span>':'<span style="color:var(--blocked)">미설정</span>');
     return `<tr>
       <td class="l"><input class="cell2" style="width:118px" value="${esc(r.preset_name)}" data-i="${i}" data-f="preset_name"><div class="muted" style="font-size:10px">방송표기: ${esc(b)} ${esc(r.preset_name)}</div></td>
       <td class="l"><select data-i="${i}" data-f="set_code" style="min-width:270px">${presetSetOptions(r.set_code)}</select></td>
-      <td><input class="cell2" type="number" style="width:92px" value="${r.price!=null?r.price:''}" placeholder="자동" data-i="${i}" data-f="price"></td>
-      <td style="font-variant-numeric:tabular-nums">${cost!=null?won(cost):'<span class="muted">–</span>'}</td>
+      <td><input class="cell2" type="number" style="width:100px" value="${r.price!=null?r.price:''}" placeholder="${sku!=null?won(sku):'입력'}" data-i="${i}" data-f="price"></td>
+      <td style="font-variant-numeric:tabular-nums">${eff!=null?'<b>'+won(eff)+'</b>':'<span class="muted">–</span>'}<div style="font-size:10px;margin-top:1px">${src}</div></td>
       <td style="text-align:center"><input type="checkbox" ${r.active?'checked':''} data-i="${i}" data-f="active"></td>
       <td><button class="presetDel" data-i="${i}" title="삭제" style="border:none;background:transparent;color:var(--blocked);cursor:pointer;font-size:15px">✕</button></td>
     </tr>`;}).join(''):'<tr><td class="state" colspan="6">구성이 없습니다 — "구성 추가"로 시작</td></tr>');

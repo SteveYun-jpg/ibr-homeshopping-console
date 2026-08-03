@@ -995,12 +995,19 @@ tbody tr:hover{background:var(--bg1)}
 </div>
 <div class="mask" id="pwMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:52;padding:20px">
   <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:24px;max-width:400px;width:100%">
-    <div style="display:flex;align-items:center;margin-bottom:4px"><b style="font-size:16px">🔑 비밀번호 변경</b><div class="spacer"></div><button class="btn sm" id="pwClose">닫기</button></div>
-    <p class="muted" style="margin:0 0 14px">새 비밀번호를 입력하세요 (6자 이상).</p>
+    <div style="display:flex;align-items:center;margin-bottom:4px"><b style="font-size:16px">비밀번호 변경</b><div class="spacer"></div><button class="btn sm" id="pwClose">닫기</button></div>
+    <div id="pwRecoveryBox" style="display:none;background:#EDF7F3;border:1px solid #CFE9E5;border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:12.5px;line-height:1.55">
+      <b>재설정 메일로 들어오셨습니다.</b><br>여기서 새 비밀번호를 정하면 바로 로그인됩니다. 이 창을 닫으면 링크가 만료될 수 있으니 지금 변경해 주세요.</div>
+    <p class="muted" id="pwHint" style="margin:0 0 14px">새 비밀번호를 입력하세요 (6자 이상).</p>
     <label>새 비밀번호</label><input type="password" id="pwNew" autocomplete="new-password">
     <label style="margin-top:10px;display:block">새 비밀번호 확인</label><input type="password" id="pwNew2" autocomplete="new-password">
+    <div id="pwNonceBox" style="display:none;margin-top:10px">
+      <label>메일로 받은 인증코드</label><input type="text" id="pwNonce" placeholder="6자리 코드" autocomplete="one-time-code">
+      <div class="muted" style="font-size:11px;margin-top:4px">보안 설정 때문에 본인 확인이 한 번 더 필요합니다. 메일함에서 코드를 확인해 입력하세요.</div>
+    </div>
     <div class="msg" id="pwMsg"></div>
     <button class="btn primary" id="pwSave" style="width:100%;padding:11px;margin-top:14px">변경</button>
+    <button class="btn" id="pwResend" style="width:100%;padding:9px;margin-top:8px;display:none">재설정 메일 다시 받기</button>
   </div>
 </div>
 <div class="mask" id="suMask" style="position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:52;padding:20px">
@@ -1452,10 +1459,19 @@ async function loadMembers(){if(!isAdmin()){navTo('home');return;}
     {h:'직급',l:true,f:r=>esc(r.title||'-')},
     {h:'등급',f:r=>`<select class="cell2" data-uid="${r.user_id}" data-f="grade">${GRADES.map(g=>`<option ${r.grade===g?'selected':''}>${g}</option>`).join('')}</select>`},
     {h:'가입일',l:true,f:r=>(r.updated_at||'').slice(0,10)},
+    {h:'비밀번호',f:r=>r.email?`<button class="btn sm" data-uid="${r.user_id}" data-act="reset" data-em="${esc(r.email)}" title="이 사람 메일로 재설정 링크를 보냅니다">재설정 메일</button>`:'<span class="muted">–</span>',flt:false},
     {h:'',f:r=>r.approved?`<button class="btn sm" data-uid="${r.user_id}" data-act="revoke">승인취소</button>`:`<button class="btn primary sm" data-uid="${r.user_id}" data-act="approve">승인</button>`}
   ],rows,'가입자 없음',()=>{
     document.querySelectorAll('#t_members select[data-f="grade"]').forEach(el=>el.onchange=async()=>{const {error}=await sb.from('hs_member').update({grade:el.value}).eq('user_id',el.dataset.uid);toast(error?'변경 실패':(el.value+'(으)로 등급 변경'),error?'err':'ok');});
     document.querySelectorAll('#t_members button[data-act]').forEach(b=>b.onclick=async()=>{const uid=b.dataset.uid,act=b.dataset.act;
+      if(act==='reset'){
+        const em=b.dataset.em;
+        if(!confirm(em+' 으로 비밀번호 재설정 링크를 보낼까요?\n\n본인이 메일의 링크를 누르면 비밀번호 변경 창이 자동으로 열립니다. (링크는 1시간 유효)'))return;
+        b.disabled=true;b.textContent='보내는 중…';
+        const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname+'?recovery=1'});
+        b.disabled=false;b.textContent='재설정 메일';
+        toast(error?('발송 실패 — '+pwErrMsg(error)):(em+' 으로 재설정 메일 발송'),error?'err':'ok');
+        return;}
       if(act==='approve'){const {error}=await sb.from('hs_member').update({approved:true,approved_at:new Date().toISOString(),approved_by:$('who').textContent}).eq('user_id',uid);if(error){toast('승인 실패: '+error.message,'err');return;}toast('승인됨','ok');}
       else{if(!confirm('이 계정 승인을 취소할까요? 다음 접속부터 차단됩니다.'))return;const {error}=await sb.from('hs_member').update({approved:false}).eq('user_id',uid);if(error){toast('실패: '+error.message,'err');return;}toast('승인 취소됨','ok');}
       loadMembers();});
@@ -1477,19 +1493,69 @@ function toggleUserMenu(force){const m=$('userMenu');const show=force!==undefine
 $('userTrigger').onclick=(e)=>{e.stopPropagation();if(!AUTHED){toast('로그인이 필요합니다','warn');return;}toggleUserMenu();};
 document.addEventListener('click',(e)=>{const m=$('userMenu');if(m.style.display==='block'&&!m.contains(e.target)&&!$('userTrigger').contains(e.target))toggleUserMenu(false);});
 $('umMe').onclick=()=>{toggleUserMenu(false);openMe();};
-$('umPw').onclick=()=>{toggleUserMenu(false);$('pwNew').value='';$('pwNew2').value='';$('pwMsg').textContent='';$('pwMask').style.display='flex';};
+$('umPw').onclick=()=>{toggleUserMenu(false);openPwModal(false);};
 $('umLogout').onclick=async()=>{toggleUserMenu(false);try{localStorage.removeItem('hsLogin');}catch(_){}window._hsAuto=false;await sb.auth.signOut();await refreshAuth();};
 // 비밀번호 변경
-$('pwClose').onclick=()=>$('pwMask').style.display='none';
+// 복구 진입 판정 — Supabase가 붙이는 해시(type=recovery)와 우리가 붙인 쿼리(?recovery=1) 둘 다 인정
+let PW_RECOVERY=(function(){try{return /type=recovery/.test(location.hash)||/[?&]recovery=1/.test(location.search);}catch(_){return false;}})();
+function openPwModal(recovery){
+  PW_RECOVERY=!!recovery||PW_RECOVERY;
+  $('pwNew').value='';$('pwNew2').value='';$('pwMsg').textContent='';
+  if($('pwNonce'))$('pwNonce').value='';
+  $('pwNonceBox').style.display='none';
+  $('pwRecoveryBox').style.display=PW_RECOVERY?'':'none';
+  $('pwResend').style.display=PW_RECOVERY?'':'none';
+  $('pwHint').textContent=PW_RECOVERY?'새로 쓸 비밀번호를 정해주세요 (6자 이상).':'새 비밀번호를 입력하세요 (6자 이상).';
+  $('pwMask').style.display='flex';setTimeout(()=>$('pwNew').focus(),100);
+}
+$('pwClose').onclick=()=>{$('pwMask').style.display='none';
+  if(PW_RECOVERY)toast('변경하지 않으면 링크가 만료될 수 있습니다 — 내 정보에서 다시 열 수 있어요','warn');};
+// 비밀번호 오류를 사람 말로 — 무엇이 문제고 다음에 뭘 하면 되는지까지
+function pwErrMsg(err){
+  const c=(err&&(err.code||''))+'',msg=((err&&err.message)||'')+'';
+  if(/session|missing|jwt|expired|invalid.*token/i.test(msg)||/session_not_found|refresh_token/i.test(c))
+    return '재설정 링크가 만료됐습니다(발송 후 1시간). 아래 「재설정 메일 다시 받기」를 눌러 새 링크를 받아주세요.';
+  if(/same.?password|should be different/i.test(msg)||/same_password/i.test(c))
+    return '이전과 같은 비밀번호입니다. 다른 비밀번호로 정해주세요.';
+  if(/reauthentication|nonce/i.test(msg)||/reauthentication/i.test(c))
+    return '본인 확인이 한 번 더 필요합니다. 메일로 보낸 인증코드를 입력한 뒤 다시 눌러주세요.';
+  if(/weak|password.*short|at least/i.test(msg)||/weak_password/i.test(c))
+    return '비밀번호가 너무 단순합니다. 6자 이상, 숫자·영문을 섞어주세요.';
+  if(/rate|too many/i.test(msg)) return '요청이 너무 잦습니다. 1분 뒤 다시 시도해주세요.';
+  if(/Failed to fetch|NetworkError/i.test(msg)) return '네트워크 연결을 확인해주세요.';
+  return msg||'알 수 없는 오류가 발생했습니다.';
+}
 $('pwSave').onclick=async()=>{const a=$('pwNew').value,b=$('pwNew2').value,m=$('pwMsg');m.style.color='var(--blocked)';
   if(a.length<6){m.textContent='6자 이상 입력하세요.';return;}
   if(a!==b){m.textContent='두 비밀번호가 일치하지 않습니다.';return;}
   const btn=$('pwSave');btn.disabled=true;btn.textContent='변경 중…';
-  const {error}=await sb.auth.updateUser({password:a});
+  // 세션이 살아있는지 먼저 확인 — 만료된 링크로 눌렀을 때 원인 불명으로 끝나지 않게
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){btn.disabled=false;btn.textContent='변경';
+    m.innerHTML='로그인 세션이 없습니다. 재설정 메일의 링크를 다시 눌러 들어와 주세요.';
+    $('pwResend').style.display='';return;}
+  const nonce=($('pwNonce')&&$('pwNonce').value.trim())||'';
+  const payload=nonce?{password:a,nonce}:{password:a};
+  const {error}=await sb.auth.updateUser(payload);
   btn.disabled=false;btn.textContent='변경';
-  if(error){m.textContent='오류: '+error.message;return;}
+  if(error){
+    m.textContent=pwErrMsg(error);
+    if(/reauthentication|nonce/i.test((error.message||'')+(error.code||''))){
+      $('pwNonceBox').style.display='';
+      try{await sb.auth.reauthenticate();m.textContent='인증코드를 메일로 보냈습니다. 코드를 입력한 뒤 다시 「변경」을 눌러주세요.';m.style.color='var(--brand-ink)';}catch(_){}
+    }
+    if(/만료/.test(m.textContent))$('pwResend').style.display='';
+    return;}
   try{const s=JSON.parse(localStorage.getItem('hsLogin')||'null');if(s&&s.e){s.p=a;localStorage.setItem('hsLogin',JSON.stringify(s));}}catch(_){}
+  PW_RECOVERY=false;$('pwRecoveryBox').style.display='none';$('pwNonceBox').style.display='none';$('pwResend').style.display='none';
   $('pwMask').style.display='none';toast('비밀번호가 변경되었습니다','ok');};
+$('pwResend')&&($('pwResend').onclick=async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  const em=(session&&session.user.email)||(ME&&ME.email)||$('liEmail').value.trim();
+  if(!em){$('pwMsg').textContent='이메일을 알 수 없습니다. 로그인 화면에서 이메일을 입력하고 「비밀번호를 잊으셨나요?」를 눌러주세요.';return;}
+  const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname+'?recovery=1'});
+  const m=$('pwMsg');m.style.color=error?'var(--blocked)':'var(--brand-ink)';
+  m.textContent=error?pwErrMsg(error):('✓ '+em+' 으로 새 링크를 보냈습니다. 메일함(스팸 포함)을 확인하세요.');});
 // 직원 가입
 $('liSignup').onclick=(ev)=>{ev.preventDefault();['suName','suEmpNo','suPhone','suPersonalEmail','suBirth','suHire','suTeam','suTitle','suJob','suPw'].forEach(id=>{if($(id))$(id).value='';});$('suEmail').value=$('liEmail').value.trim();$('suMsg').textContent='';$('suMask').style.display='flex';};
 $('suClose').onclick=()=>$('suMask').style.display='none';
@@ -1510,7 +1576,7 @@ $('suSave').onclick=async()=>{const nm=$('suName').value.trim(),tm=$('suTeam').v
   if(data&&data.session){m.textContent='✓ 가입 완료. 로그인되었습니다.';setTimeout(async()=>{$('suMask').style.display='none';await refreshAuth();loadHome();initMaterial();},900);}
   else{m.textContent='✓ 가입 신청 완료. 이메일로 온 확인 링크를 눌러 인증한 뒤 로그인하세요.';}};
 $('meClose').onclick=()=>$('meMask').style.display='none';
-$('mePw').onclick=()=>{$('pwNew').value='';$('pwNew2').value='';$('pwMsg').textContent='';$('pwMask').style.display='flex';};
+$('mePw').onclick=()=>{openPwModal(false);};
 ['meName','meEmpNo','mePhone','meBirth','meHire','meTeam','meTitle','meJob'].forEach(id=>{const el=$(id);if(el)el.addEventListener('input',meFill);});
 $('meSave').onclick=async()=>{const row={user_id:ME.user_id,email:ME.email,name:$('meName').value,title:$('meTitle').value,team:$('meTeam').value,phone:$('mePhone').value,emp_no:$('meEmpNo').value.trim()||null,personal_email:$('mePersonalEmail').value.trim()||null,birth_date:$('meBirth').value||null,hire_date:$('meHire').value||null,job:$('meJob').value.trim()||null,updated_by:ME.email};
   const {error}=await sb.from('hs_member').upsert(row,{onConflict:'user_id'});
@@ -1536,9 +1602,14 @@ $('liPw').addEventListener('keydown',e=>{if(e.key==='Enter')signIn();});
 $('liEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('liPw').focus();});
 $('liForgot').onclick=async(ev)=>{ev.preventDefault();const e=$('liEmail').value.trim(),m=$('liMsg');
   if(!e){m.style.color='var(--blocked)';m.textContent='이메일을 먼저 입력하세요.';return;}
-  const {error}=await sb.auth.resetPasswordForEmail(e,{redirectTo:location.origin+location.pathname});
-  m.style.color=error?'var(--blocked)':'var(--brand-ink)';m.textContent=error?('오류: '+error.message):'✓ 재설정 메일을 보냈습니다. 메일함(스팸 포함)을 확인하세요.';};
-sb.auth.onAuthStateChange(()=>refreshAuth());
+  const btn=ev.target;btn.style.pointerEvents='none';
+  const {error}=await sb.auth.resetPasswordForEmail(e,{redirectTo:location.origin+location.pathname+'?recovery=1'});
+  setTimeout(()=>btn.style.pointerEvents='',3000);
+  m.style.color=error?'var(--blocked)':'var(--brand-ink)';
+  m.innerHTML=error?pwErrMsg(error)
+    :`✓ <b>${esc(e)}</b> 으로 재설정 메일을 보냈습니다.<br><span style="font-size:11.5px">메일함(스팸 포함)에서 링크를 누르면 <b>비밀번호 변경 창이 자동으로 열립니다</b>. 링크는 1시간 동안만 유효합니다.</span>`;};
+sb.auth.onAuthStateChange((ev)=>{refreshAuth();
+  if(ev==='PASSWORD_RECOVERY'){PW_RECOVERY=true;setTimeout(()=>openPwModal(true),300);}});
 ['mGoal','mPrice'].forEach(i=>$(i).addEventListener('input',()=>{const g=num('mGoal'),p=num('mPrice');if(g>0&&p>0)$('mQty').value=Math.round(g/p);}));
 function needLogin(){return !AUTHED;}
 
@@ -4579,7 +4650,8 @@ $('noticeSideBtn')&&($('noticeSideBtn').onclick=async()=>{const n=await loadLate
 refreshAuth().then(async()=>{
   const h=parseHash();                                   // 새로고침 시 보던 화면 복원
   try{history.replaceState(h||{v:'home'},'',h?viewHash(h.v,h.id):location.pathname);}catch(_){}
-  if(AUTHED){await initMaterial();if(h)routeTo(h);else loadHome();checkNotice();}
+  if(AUTHED){await initMaterial();if(h)routeTo(h);else loadHome();
+    if(PW_RECOVERY)setTimeout(()=>openPwModal(true),400); else checkNotice();}
   else if(window._hsAuto&&$('liPw').value){signIn();}
 });
 sb.auth.onAuthStateChange((_e,sess)=>{initMaterial();

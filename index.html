@@ -499,7 +499,7 @@ tbody tr:hover{background:var(--bg1)}
           <div class="calhead"><button class="btn sm" id="backCal">‹ 편성으로</button><h2 class="sec" id="bcTitle" style="margin-left:6px">방송</h2><div class="spacer"></div>
             <button class="btn sm" id="delBc" style="color:var(--blocked);border-color:#f3c9c9">삭제</button><button class="btn primary sm" id="saveBc">방송 저장</button><button class="btn sm" id="genReport">보고 멘트</button><button class="btn primary sm" id="genSettle">정산서</button></div>
           <div class="card"><div id="bcSub" style="font-size:17px;font-weight:800;color:var(--ink1);letter-spacing:-.01em;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--brand-soft)"></div><div style="display:flex;gap:10px;flex-wrap:wrap" id="bcKpis"></div></div>
-          <div class="card"><h3 style="display:flex;align-items:center;gap:8px">방송 정보 <span id="bcLock" style="display:none;color:var(--blocked);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">🔒 방송 완료 · 편성 조건 잠금 <span style="color:var(--ok);font-weight:600">(실적·구성은 입력 가능)</span></span></h3>
+          <div class="card"><h3 style="display:flex;align-items:center;gap:8px">방송 정보 <span id="bcLock" style="display:none;color:var(--blocked);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">방송 완료 · 편성 조건 잠금 <span style="color:var(--ok);font-weight:600">(실적·구성은 입력 가능)</span></span><button class="btn sm" id="bcUnlock" style="display:none;font-size:11px;padding:3px 10px">수정 잠금 해제</button><span id="bcUnlocked" style="display:none;color:var(--gold);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">잠금 해제됨 — 수정 내역이 기록됩니다</span></h3>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 홈쇼핑사 <span class="muted" id="fChTag" style="font-weight:400"></span></label><select id="fChannel"></select></div><div><label>브랜드 <span class="muted" id="fBrandHint" style="font-weight:400"></span></label><select id="fBrand"></select></div><div><label>라인 <span class="muted" id="fLineHint" style="font-weight:400"></span></label><select id="fLineTop"><option value="">라인 선택</option></select></div></div>
             <div class="row3"><div style="grid-column:1 / -1"><label><span style="color:#DC2626" title="저장 필수">●</span> 방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
             <div class="row3"><div><label>정산 구분</label><div class="seg" id="fFeeSeg"><button type="button" data-v="정액" class="on">정액</button><button type="button" data-v="정률">정률</button></div></div><div><div id="fFixedBox"><label>특약비(원)</label><input type="text" inputmode="numeric" id="fFixed"></div><div id="fRateBox" style="display:none"><label id="fRateLbl">홈사 수수료율(%)</label><input type="number" id="fRate"></div></div><div><label>거래 구분</label><div class="seg" id="fDealSeg"><button type="button" data-v="자사" class="on">자사</button><button type="button" data-v="대행">대행</button></div><span class="hint" id="dealHint" style="display:none;font-size:10.5px">대행: 수익 = 매출 × 대행수수료율</span></div></div>
@@ -763,9 +763,10 @@ tbody tr:hover{background:var(--bg1)}
       <!-- 브랜드 관리 -->
       <div class="view" id="v-brands">
         <div class="sechead"><h2 class="sec">브랜드 관리</h2><span class="tag">자사 · 대행</span></div>
-        <p class="hint">품목·BOM 체계는 <b>이보배 과장 쪽 마스터</b>에서 가져오고(브랜드 → 라인 → 세트/단품), 홈쇼핑팀은 그 위에 <b>자사/대행 구분</b>만 규정합니다. <span id="brDealNote"></span></p>
+        <p class="hint">품목·BOM 체계는 <b>이보배 과장 쪽 마스터</b>에서 가져오고(브랜드 → 라인 → 세트/단품), 홈쇼핑팀은 그 위에 <b>자사/대행 구분</b>만 규정합니다.<br>
+          <b>홈쇼핑 운영대행만 하고 우리가 매입·온라인판매를 하지 않는 브랜드</b>는 SCM 등록이 필요 없으므로 <b>「+ 브랜드 추가」</b>로 여기서 직접 만드세요. 그 브랜드는 라인·구성·판매가를 콘솔에서 관리하고 원가는 잡히지 않습니다. <span id="brDealNote"></span></p>
         <div class="seg" id="brDealSeg" style="max-width:280px;margin:0 0 10px"><button class="on" data-v="all">전체</button><button data-v="자사">자사 브랜드</button><button data-v="대행">대행 브랜드</button></div>
-        <div class="toolbar"><div class="seg" id="brFilter" style="max-width:200px;margin:0"><button class="on" data-v="prod">상품보유</button><button data-v="all">전체</button></div><input class="search" id="brSearch" placeholder="브랜드·라인 검색" style="max-width:240px"><div class="spacer"></div><span class="muted" id="brCount" style="margin-right:10px"></span><button class="btn primary sm" id="brSave">저장</button></div>
+        <div class="toolbar"><div class="seg" id="brFilter" style="max-width:200px;margin:0"><button class="on" data-v="prod">상품보유</button><button data-v="all">전체</button></div><input class="search" id="brSearch" placeholder="브랜드·라인 검색" style="max-width:240px"><div class="spacer"></div><span class="muted" id="brCount" style="margin-right:10px"></span><button class="btn sm" id="brAdd">+ 브랜드 추가</button><button class="btn primary sm" id="brSave">저장</button></div>
         <div class="card scroll" style="padding:0"><table id="t_brands"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
       </div>
 
@@ -2486,7 +2487,45 @@ async function loadSettleMonthly(){
     {h:'매출이익',f:r=>`${won(r.이익)}${r.미등록?' <span title="원가 미등록 품목 포함 — 이익 과대 표기" style="color:var(--gold)">⚠</span>':''}`,style:r=>'font-weight:700;color:'+(r.이익<0?'var(--blocked)':'var(--ink1)')},
     {h:'이익률',f:r=>r.미등록?'<span class="muted">–</span>':(r.회계마감?`<span title="매출이익 ÷ 회계마감 매출">${Math.round(100*r.이익/r.회계마감)}%</span>`:'–')},
     {h:'비중',f:r=>tot?((100*r[amtKey]/tot).toFixed(1)+'%'):'–'}
-  ],arr,'해당 기간 정산 데이터 없음',null,null,{filter:true});}
+  ],arr,'해당 기간 정산 데이터 없음',
+    ()=>{const hint=$('settleBasisNote');if(hint)hint.remove();
+      const box=document.createElement('div');box.id='settleBasisNote';box.className='hint';box.style.marginTop='8px';
+      box.innerHTML='<b>기준</b> — 영업기준 = <b>소비자 판매가</b>(고객이 실제 낸 금액) · 회계마감기준 = <b>소비자 판매가 − 홈사 수수료</b>(직매입은 공급가). '
+        +'행을 누르면 그 '+ax.h+'의 <b>산출내역</b>(정산서 어느 줄이 얼마로 들어왔는지)이 열립니다.';
+      const t=$('t_settle').closest('table').parentElement;t.parentElement.appendChild(box);},
+    r=>openBasisDetail(ax,r.k,ym),{filter:true});}
+// 회계마감 금액이 어떤 정산 줄에서 나왔는지 — "어떤 항목으로 연결되는지" 질문에 화면으로 답한다
+async function openBasisDetail(ax,key,ym){
+  let q=sb.from('hs_v_settle_base').select('*');if(ym)q=q.eq('ym',ym);
+  const {data,error}=await q;
+  if(error){toast('조회 실패 — '+dbMsg(error),'err');return;}
+  const col={홈사:'channel_name',브랜드:'brand_name',제품:'product_name',판매채널:'sales_channel',법인:'channel_corp',자사대행:'deal_type'}[ax.h]||'channel_name';
+  const rows=(data||[]).filter(r=>String(r[col]||'(미상)')===String(key));
+  const sum=(f)=>rows.reduce((a,r)=>a+(+r[f]||0),0);
+  const 영업=sum('sales_amount'),회계=sum('acct_amount'),정산액=sum('settle_amount');
+  const byM={};rows.forEach(r=>{const k=(r.revenue_method||'미지정')+' · '+(r.deal_form||'거래유형 미지정');
+    const a=byM[k]||(byM[k]={k,n:0,영업:0,회계:0,정산:0});a.n++;a.영업+=+r.sales_amount||0;a.회계+=+r.acct_amount||0;a.정산+=+r.settle_amount||0;});
+  $('qD_title')&&0;
+  const html=`<div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:16px">${esc(key)} · 회계마감 산출내역</b>
+      <div class="spacer"></div><button class="btn sm" onclick="document.getElementById('basisMask').style.display='none'">닫기</button></div>
+    <div class="kpis" style="margin:0 0 12px">
+      <div class="kpi brand"><div class="l">영업기준 (소비자 판매가)</div><div class="v">${won(영업)}</div></div>
+      <div class="kpi"><div class="l">회계마감기준</div><div class="v">${won(회계)}</div><div class="s">소비자판매가 − 홈사 수수료</div></div>
+      <div class="kpi"><div class="l">정산서 원금액</div><div class="v">${won(정산액)}</div><div class="s">홈사가 준 정산서 숫자 그대로</div></div>
+    </div>
+    <div class="card scroll" style="padding:0;margin:0"><table style="width:100%"><thead><tr>
+      <th class="l">정산방식 · 거래유형</th><th>행수</th><th>영업기준</th><th>회계마감</th><th>정산서 금액</th><th class="l">계산식</th></tr></thead>
+      <tbody>${Object.values(byM).map(a=>`<tr>
+        <td class="l">${esc(a.k)}</td><td>${a.n}</td><td>${won(a.영업)}</td><td><b>${won(a.회계)}</b></td><td>${won(a.정산)}</td>
+        <td class="l" style="font-size:11px;color:var(--ink3)">${a.k.startsWith('순액법')?'회계 = 소비자판매가 − 정산서금액(=홈사 수수료)':'회계 = 정산서금액 (수수료 차감 후 우리 수령액 / 직매입은 공급가)'}</td>
+      </tr>`).join('')||'<tr><td class="state" colspan="6">데이터 없음</td></tr>'}</tbody></table></div>
+    <p class="hint" style="margin-top:10px">회계마감기준은 <b>세금계산서 발행월</b> 기준입니다. 소비자판매가가 비어 있는 행은 영업기준이 정산액으로 잡히니 월별 검수의 「소비자판매가 미입력」을 함께 봐주세요.</p>`;
+  let mask=$('basisMask');
+  if(!mask){mask=document.createElement('div');mask.id='basisMask';mask.className='mask';
+    mask.style.cssText='position:fixed;inset:0;background:rgba(15,42,63,.4);display:none;align-items:center;justify-content:center;z-index:56;padding:20px';
+    mask.innerHTML='<div class="modal" id="basisBox" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:820px;width:100%;max-height:88vh;overflow:auto"></div>';
+    document.body.appendChild(mask);mask.onclick=e=>{if(e.target===mask)mask.style.display='none';};}
+  $('basisBox').innerHTML=html;mask.style.display='flex';}
 
 // ===== 영업기준 = 방송월 귀속 손익 (뼈대: 원가는 세트코드→원가표/BOM 연결되면 자동 채움) =====
 let SB_AXIS='홈사';
@@ -3100,6 +3139,23 @@ $('chTabs')&&$('chTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   $('chTag').textContent=CH_TAG[CH_TAB]||'';
   if(CH_TAB==='fee')loadFee();});
 
+// 콘솔 전용 브랜드 등록 — SCM에 품목이 없는 운영대행 브랜드용
+$('brAdd')&&($('brAdd').onclick=async()=>{
+  const nm=(prompt('브랜드명을 입력하세요 (예: 원더씬)\n\n※ 홈쇼핑 운영대행만 하고 우리가 매입·온라인판매를 하지 않는 브랜드용입니다.\n   자사 매입 브랜드는 SCM(이보배 과장)에 품목 등록이 먼저 필요합니다.')||'').trim();
+  if(!nm)return;
+  const {data:ex}=await sb.from('brands').select('id,name').ilike('name',nm).maybeSingle();
+  let bid=ex&&ex.id;
+  if(!bid){
+    const {data:ins,error}=await sb.from('brands').insert({name:nm,status:'active'}).select('id').maybeSingle();
+    if(error){toast('브랜드 생성 실패 — '+dbMsg(error),'err');return;}
+    bid=ins&&ins.id;
+  }
+  const deal=confirm(`${nm} — 대행 브랜드입니까?\n\n확인 = 대행 (우리가 수수료를 받음)\n취소 = 자사`)?'대행':'자사';
+  const {error:e2}=await sb.from('hs_brand_cfg').upsert({brand_name:nm,in_use:true,deal_type:deal,console_only:true,updated_by:$('who').textContent},{onConflict:'brand_name'});
+  if(e2){toast('설정 저장 실패 — '+dbMsg(e2),'err');return;}
+  toast(`${nm} 등록 (${deal}) · 라인·세트 구성에서 구성을 만드세요`,'ok');
+  BRAND_META[nm]=true;await loadBrandMeta();loadBrands();
+});
 // ===== 세트코드 허브 (품목·원가·정산 통합) =====
 // 세트코드 = 허브. 한 코드에 붙는 표준명·원가(자동)·수기원가·편성구성·정산별칭을 한자리에서.
 let HUB_BRAND='', HUB_ROWS=[], HUB_DIRTY={}, HUB_SEL=null, HUB_MAP=[], HUB_ALIAS_DIRTY={};
@@ -3440,8 +3496,11 @@ $('fPplSel')&&($('fPplSel').onchange=()=>{
     : `<span style="color:var(--gold)">이 프로그램은 회당 비용이 등록돼 있지 않습니다 — PPL 프로그램 탭에서 등록하면 자동 반영됩니다</span>`;
 });
 let PICKERS=false;
-let PICKP=[],PICK_CORENAME={},PRESETS=[];
-async function loadPresets(){const {data}=await sb.from('hs_set_preset').select('*').eq('active',true).order('tier_order');PRESETS=data||[];}
+let PICKP=[],PICK_CORENAME={},PRESETS=[],BRAND_LINES_USED={};
+async function loadPresets(){const {data}=await sb.from('hs_set_preset').select('*').eq('active',true).order('tier_order');PRESETS=data||[];
+  try{const {data:sc}=await sb.from('hs_schedules').select('line,brand_id').not('line','is',null);
+    BRAND_LINES_USED={};(sc||[]).forEach(r=>{const bn=(BRAND_DEAL[r.brand_id]||{}).name;if(!bn||!r.line)return;
+      (BRAND_LINES_USED[bn]=BRAND_LINES_USED[bn]||[]);if(!BRAND_LINES_USED[bn].includes(r.line))BRAND_LINES_USED[bn].push(r.line);});}catch(_){}}
 async function loadPickers(){
   // 공식 채널 마스터 17개 (라이브 7 + T커머스 10). 하드코딩 대신 DB 기준.
   const {data:hsc}=await sb.from('hs_channels').select('id,name,channel_type,parent_code,corp,sort_no').order('sort_no',{nullsFirst:false}).order('name');
@@ -3497,7 +3556,13 @@ async function loadPreset(){
     PCOST={};(sc||[]).forEach(x=>{if(x.unit_cost!=null)PCOST[x.set_code]=+x.unit_cost;});
   }
   await loadBrandMeta();
-  const brands=[...new Set([...PICKP.map(p=>p.brand).filter(Boolean),...Object.keys(BRAND_META).filter(b=>BRAND_META[b]===true)])].filter(isHsBrand).sort();
+  // SCM 품목이 없는 브랜드(홈쇼핑 운영대행 전용)도 콘솔에서 구성을 만들 수 있어야 한다
+  const brands=[...new Set([
+    ...PICKP.map(p=>p.brand).filter(Boolean),
+    ...Object.keys(BRAND_META).filter(b=>BRAND_META[b]===true),
+    ...PRESETS.map(p=>p.brand_name).filter(Boolean),
+    ...Object.keys(LINE_RULE_NAMES||{})
+  ])].filter(isHsBrand).sort();
   $('pbBrand').innerHTML='<option value="">브랜드 선택</option>'+brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
   $('pbLine').innerHTML='<option value="">라인 선택</option>';
   if($('pcChannel')){const chs=Object.entries(BCH).sort((a,z)=>String(a[1]).localeCompare(String(z[1]),'ko'));
@@ -3505,11 +3570,31 @@ async function loadPreset(){
   $('presetBody').innerHTML='<tr><td class="state" colspan="6">브랜드·라인을 선택하세요</td></tr>';$('pbStatus').textContent='';
   PSTATE={brand:'',line:'',channel:'',rows:[]};
 }
+function presetLinesFor(b){
+  return [...new Set([
+    ...PICKP.filter(p=>p.brand===b&&p.line).map(p=>p.line),          // SCM 품목의 라인
+    ...(LINE_RULE_NAMES[b]?[...LINE_RULE_NAMES[b]]:[]),               // 라인 설정에서 만든 라인
+    ...PRESETS.filter(p=>p.brand_name===b&&p.line).map(p=>p.line),    // 이미 구성이 있는 라인
+    ...((BRAND_LINES_USED[b]||[]))                                    // 실제 방송에 쓰인 라인
+  ].filter(Boolean))].sort();
+}
+function fillPresetLines(b,keep){
+  const lines=presetLinesFor(b);
+  $('pbLine').innerHTML='<option value="">라인 선택</option>'
+    +lines.map(l=>`<option value="${esc(l)}" ${l===keep?'selected':''}>${esc(stripLine(l,b))}</option>`).join('')
+    +'<option value="__new">＋ 새 라인 직접 입력…</option>';
+}
 $('pbBrand')&&($('pbBrand').onchange=()=>{const b=$('pbBrand').value;PSTATE={brand:b,line:'',channel:($('pcChannel')?$('pcChannel').value:''),rows:[]};
-  const lines=[...new Set(PICKP.filter(p=>p.brand===b&&p.line).map(p=>p.line))].sort();
-  $('pbLine').innerHTML='<option value="">라인 선택</option>'+lines.map(l=>`<option value="${esc(l)}">${esc(stripLine(l,b))}</option>`).join('');
+  fillPresetLines(b);
   $('presetBody').innerHTML='<tr><td class="state" colspan="6">라인을 선택하세요</td></tr>';$('pbStatus').textContent='';});
-$('pbLine')&&($('pbLine').onchange=()=>{PSTATE.line=$('pbLine').value;if(PSTATE.line)loadPresetGrid();});
+$('pbLine')&&($('pbLine').onchange=()=>{
+  if($('pbLine').value==='__new'){
+    const nm=(prompt('새 라인 이름을 입력하세요 (예: 불고기한판)')||'').trim();
+    if(!nm){fillPresetLines(PSTATE.brand,PSTATE.line);return;}
+    (BRAND_LINES_USED[PSTATE.brand]=BRAND_LINES_USED[PSTATE.brand]||[]).push(nm);
+    fillPresetLines(PSTATE.brand,nm);$('pbLine').value=nm;
+  }
+  PSTATE.line=$('pbLine').value;if(PSTATE.line)loadPresetGrid();});
 $('pcChannel')&&($('pcChannel').onchange=()=>{PSTATE.channel=$('pcChannel').value;if(PSTATE.brand&&PSTATE.line)loadPresetGrid();});
 async function loadPresetGrid(){
   const {brand,line,channel}=PSTATE;if(!brand||!line)return;
@@ -3904,6 +3989,7 @@ async function showBcForm(push){const s=BC;
   $('fHost').value=s.show_host||'';$('fPd').value=s.pd||'';$('fMd').value=s.md||'';
   $('fColor').value=s.color||productColor(s.product_name);
   BC_LOCKED=s.__new?false:((s.status==='방송완료')||(e?e<new Date():d<new Date()));
+  BC_UNLOCKED=false;
   COMP_SAVED=(!s.__new&&COMPS.length>0);
   // 새로고침/직접링크로 바로 들어온 경우 편성·방송 뷰가 꺼져 있을 수 있으므로 명시적으로 켠다
   document.querySelectorAll('.nav[data-v],.rb[data-v]').forEach(x=>x.classList.remove('active'));
@@ -3931,7 +4017,19 @@ function applyLock(){const lock=BC_LOCKED;
   $('genTick').disabled=false;$('tickStep').disabled=false;$('clrTick').disabled=false;
   {const ss=$('saveSchedule');if(ss)ss.style.display='';}
   $('bcLock').style.display=lock?'inline':'none';
+  {const ub=$('bcUnlock');if(ub)ub.style.display=lock?'inline-block':'none';}
+  {const uo=$('bcUnlocked');if(uo)uo.style.display=(!lock&&BC_UNLOCKED)?'inline':'none';}
   renderComp();}
+// 지난 방송 편성 조건 수정 — 잠금은 풀되 누가 왜 풀었는지 남긴다
+let BC_UNLOCKED=false;
+$('bcUnlock')&&($('bcUnlock').onclick=async()=>{
+  if(!BC||!BC.id)return;
+  const why=prompt('지난 방송의 편성 조건을 수정합니다.\n수정 사유를 적어주세요 (예: 7월 방송분 목표·조건 뒤늦게 입력)');
+  if(why===null)return;
+  BC_LOCKED=false;BC_UNLOCKED=true;applyLock();
+  try{await sb.from('hs_schedule_edit_log').insert({schedule_id:BC.id,action:'unlock',reason:why||'(사유 없음)',
+    actor_id:(ME&&ME.user_id)||null,actor_name:(ME&&ME.name)||$('who').textContent});}catch(_){}
+  toast('잠금 해제 — 수정 후 저장하세요 (내역 기록됨)','ok');});
 function applyDraftGate(){const isNew=!!(BC&&BC.__new);
   // 단계: ① 방송정보 저장 → 구성 열림  ② 구성 저장 → 실시간 콜 열림
   // 방송 종료 여부는 게이트에 넣지 않는다 — 실적은 방송이 끝난 뒤에 입력하는 게 정상.
@@ -4092,18 +4190,24 @@ async function clRender(){const id=CL_ID;if(!id)return;await ensureChannels();
   const totQty=li>=0?cps.reduce((a,c)=>a+(+(tks[li].comp_qtys||{})[c.seq]||0),0):0,tgt=+s.target_sales||0;
   const d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null,nowT=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const shown=tks.map((t,i)=>({t,i})).filter(x=>x.t.calls!=null||Object.keys(x.t.comp_qtys||{}).length).slice(-60);
-  const compTh=cps.map(c=>`<th>${esc((c.name||'').slice(0,8))}</th>`).join('');
+  // 구성명이 잘려 3/6/9개월 구분이 안 되던 문제 — 공통 접두어(브랜드·라인)는 한 번만 쓰고 컬럼엔 구분되는 부분만
+  const compPrefix=(function(){const ns=cps.map(c=>(c.name||'').trim()).filter(Boolean);
+    if(ns.length<2)return '';let p=ns[0];
+    for(const n of ns){let i=0;while(i<p.length&&i<n.length&&p[i]===n[i])i++;p=p.slice(0,i);}
+    p=p.replace(/[^\s]*$/,'');return p.trim().length>=2?p:'';})();
+  const compLabel=c=>{let n=(c.name||'').trim();if(compPrefix&&n.startsWith(compPrefix))n=n.slice(compPrefix.length).trim();return n||(c.name||'');};
+  const compTh=cps.map(c=>`<th title="${esc(c.name||'')}" style="white-space:normal;word-break:keep-all;min-width:56px;max-width:92px;line-height:1.25">${esc(compLabel(c))}</th>`).join('');
   const body=shown.map(({t,i})=>{const q=t.comp_qtys||{},qc=cps.map(c=>`<td style="text-align:center">${q[c.seq]||''}</td>`).join('');
     const rpm=rate[i],rpmTxt=rpm==null?'<span style="color:#bbb">–</span>':(rpm>0?'+'+won(rpm):(rpm<0?won(rpm):'0'));
     return `<tr><td>${new Date(t.tick_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</td><td style="text-align:center;font-weight:700">${t.calls??''}</td>${qc}<td style="text-align:right;font-weight:700;color:#0D9488">${rpmTxt}</td><td style="text-align:right;font-weight:700">${won(cums[i])}</td><td>${esc(t.memo||'')}</td></tr>`;}).join('')||`<tr><td colspan="${4+cps.length}" style="text-align:center;padding:24px;color:#888">아직 입력된 콜이 없습니다</td></tr>`;
   v.innerHTML=`<div style="max-width:940px;margin:0 auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:18px">📞 실시간 콜 현황</b><span style="color:#888;font-size:12px">${nowT} 기준 · 15초 자동 새로고침 · 조회 전용</span><div style="flex:1"></div><a href="#home" onclick="event.preventDefault();location.replace(location.pathname+'#home');location.reload();return false" style="font-size:12px;color:#0f766e;text-decoration:none">콘솔로 →</a></div>
     <div style="font-size:16px;font-weight:800">${esc(BCH[s.channel_id]||'')} · ${esc(s.product_name||'')}</div>
-    <div style="color:#888;font-size:12.5px;margin-bottom:12px">${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${hhmm(d)}${e?'~'+hhmm(e):''}</div>
+    <div style="color:#888;font-size:12.5px;margin-bottom:12px">${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${hhmm(d)}${e?'~'+hhmm(e):''}${compPrefix?` · 구성 <b style="color:#0f766e">${esc(compPrefix)}</b> 기준`:''}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">${[['누적 매출',won(lastSales)],['누적 판매수량',won(totQty)+'개'],['목표',won(tgt)],['달성률',(tgt?Math.round(lastSales/tgt*100):0)+'%'],['최종 콜',last&&last.calls!=null?last.calls:'–']].map(k=>`<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 16px;min-width:110px"><div style="font-size:11px;color:#888">${k[0]}</div><div style="font-size:18px;font-weight:800">${k[1]}</div></div>`).join('')}</div>
     <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:auto"><table id="clTbl" style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#eef4f1"><th>시각</th><th>콜</th>${compTh}<th>분당매출</th><th>매출(누적)</th><th>특이</th></tr></thead><tbody>${body}</tbody></table></div>
     <div style="color:#aaa;font-size:11px;margin-top:8px">IBR COMMERCE 홈쇼핑팀 · 실시간 콜 현황(입력은 콘솔에서)</div></div>`;
-  v.querySelectorAll('#clTbl th,#clTbl td').forEach(c=>{c.style.padding='6px 10px';c.style.borderBottom='1px solid #eee';if(c.tagName==='TH')c.style.textAlign='center';});}
+  v.querySelectorAll('#clTbl th,#clTbl td').forEach(c=>{c.style.padding='6px 8px';c.style.borderBottom='1px solid #eee';if(c.tagName==='TH')c.style.textAlign='center';});}
 function syncBcChart(){const labels=TICKS.map(t=>hhmm(new Date(t.tick_at))),sales=tickCums(),calls=TICKS.map(t=>+t.calls||0);
   if(bcChart)bcChart.destroy();
   bcChart=new Chart($('bcChart'),{data:{labels,datasets:[{type:'line',label:'누적매출',data:sales,yAxisID:'y',borderColor:'#0D9488',backgroundColor:'rgba(13,148,136,.1)',tension:.25,fill:true},{type:'line',label:'콜',data:calls,yAxisID:'y1',borderColor:'#E5484D',tension:.25}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Pretendard'}}}},scales:{y:{position:'left',ticks:{callback:v=>baekman(v)+'백만'}},y1:{position:'right',grid:{drawOnChartArea:false}}}}});}
@@ -4147,6 +4251,10 @@ async function saveSchedule(silent){
   {const d2=new Date(airIso),e2=endIso?new Date(endIso):null;$('bcTitle').textContent=`${BCH[BC.channel_id]||''} ${BC.product_name||''}`;$('bcSub').textContent=`${d2.getFullYear()}.${d2.getMonth()+1}.${d2.getDate()}(${DOW[d2.getDay()]}) ${hhmm(d2)}${e2?'~'+hhmm(e2):''} · ${feeType==='정액'?('정액 '+baekman(BC.fee_amount)+'백만'):('정률 '+Math.round((BC.commission_rate||0)*100)+'%')}`;}
   applyLock();applyDraftGate();
   if(wasNew){try{history.replaceState({v:'bcdetail',id:BC.id},'');}catch(_){}}
+  if(!err&&BC_UNLOCKED&&!wasNew){try{await sb.from('hs_schedule_edit_log').insert({schedule_id:BC.id,action:'edit',
+    reason:'잠금 해제 후 수정',changes:{target_sales:row.target_sales,net_target:row.net_target,fee_type:feeType,
+      fee_amount:row.fee_amount,commission_rate:row.commission_rate,air_at:airIso,conv_rate:row.conv_rate},
+    actor_id:(ME&&ME.user_id)||null,actor_name:(ME&&ME.name)||$('who').textContent});}catch(_){}}
   if(!silent)toast(err?'저장 실패':(wasNew?(dealType==='대행'?'방송 생성됨':'방송정보 저장 (작성중) · 구성까지 저장해야 확정됩니다'):'방송 정보 저장됨'),err?'err':'ok');
   updateSaveGate();
   return !err;}

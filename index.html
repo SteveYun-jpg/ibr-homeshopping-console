@@ -3143,17 +3143,12 @@ $('chTabs')&&$('chTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 $('brAdd')&&($('brAdd').onclick=async()=>{
   const nm=(prompt('브랜드명을 입력하세요 (예: 원더씬)\n\n※ 홈쇼핑 운영대행만 하고 우리가 매입·온라인판매를 하지 않는 브랜드용입니다.\n   자사 매입 브랜드는 SCM(이보배 과장)에 품목 등록이 먼저 필요합니다.')||'').trim();
   if(!nm)return;
-  const {data:ex}=await sb.from('brands').select('id,name').ilike('name',nm).maybeSingle();
-  let bid=ex&&ex.id;
-  if(!bid){
-    const {data:ins,error}=await sb.from('brands').insert({name:nm,status:'active'}).select('id').maybeSingle();
-    if(error){toast('브랜드 생성 실패 — '+dbMsg(error),'err');return;}
-    bid=ins&&ins.id;
-  }
   const deal=confirm(`${nm} — 대행 브랜드입니까?\n\n확인 = 대행 (우리가 수수료를 받음)\n취소 = 자사`)?'대행':'자사';
-  const {error:e2}=await sb.from('hs_brand_cfg').upsert({brand_name:nm,in_use:true,deal_type:deal,console_only:true,updated_by:$('who').textContent},{onConflict:'brand_name'});
-  if(e2){toast('설정 저장 실패 — '+dbMsg(e2),'err');return;}
-  toast(`${nm} 등록 (${deal}) · 라인·세트 구성에서 구성을 만드세요`,'ok');
+  // 코어 brands 테이블은 전사 공용이라 직접 쓰기가 막혀 있음 → 홈쇼핑팀 전용 함수로 등록
+  const {data,error}=await sb.rpc('hs_brand_create',{p_name:nm,p_deal:deal});
+  if(error){toast('브랜드 등록 실패 — '+dbMsg(error),'err');return;}
+  const r=Array.isArray(data)?data[0]:data;
+  toast(`${nm} ${r&&r.out_created===false?'연결됨':'등록'} (${deal}) · 라인·세트 구성에서 구성을 만드세요`,'ok');
   BRAND_META[nm]=true;await loadBrandMeta();loadBrands();
 });
 // ===== 세트코드 허브 (품목·원가·정산 통합) =====

@@ -2459,13 +2459,77 @@ $('suPreview')&&($('suPreview').onclick=async()=>{
   $('suSave').disabled=!(rows.length&&$('suChannel').value&&$('suYm').value);
   if(!$('suChannel').value||!$('suYm').value)$('suMsg').innerHTML='<span style="color:var(--gold)">홈쇼핑사·정산월을 선택하세요</span>';
 });
+// 적재 전 대조 — 기존 vs 신규를 보여주고 확인받는다 (조용히 덮어쓰지 않는다)
+function suChecksum(rows,file){
+  const n=rows.length, g=rows.reduce((a,r)=>a+(+r.gross_amount||0),0), q=rows.reduce((a,r)=>a+(+r.qty||0),0);
+  return `${n}|${Math.round(g)}|${Math.round(q)}|${(file||'').replace(/\s/g,'')}`;
+}
+async function suPreflight(ch,ym,forms,rows,file){
+  const chName=BCH[ch]||'';
+  let q=sb.from('hs_settle_raw').select('qty,gross_amount,sellout_amount,source_file,deal_form').eq('channel_id',ch).eq('settle_month',ym);
+  if(forms.length===1)q=q.eq('deal_form',forms[0]);
+  const {data:old}=await q;
+  const O=old||[];
+  const sum=(a,f)=>a.reduce((x,r)=>x+(+r[f]||0),0);
+  const cur={n:O.length,g:sum(O,'gross_amount'),q:sum(O,'qty'),files:[...new Set(O.map(r=>r.source_file).filter(Boolean))]};
+  const neu={n:rows.length,g:sum(rows,'gross_amount'),q:sum(rows,'qty')};
+  const chk=suChecksum(rows,file);
+  const {data:dup}=await sb.from('hs_settle_batch').select('id,loaded_at,loaded_by')
+    .eq('channel_id',ch).eq('settle_month',ym).eq('checksum',chk).eq('status','active').limit(1);
+  const hint=(CHS||[]).find(c=>c.id===ch);
+  const canon=hint&&hint.canonical_file_hint;
+  const warns=[];
+  if(dup&&dup.length)warns.push(`이 파일은 <b>이미 올라간 파일과 내용이 같습니다</b> (${String(dup[0].loaded_at).slice(0,10)} ${esc(dup[0].loaded_by||'')}). 다시 올리면 같은 내용으로 덮어씁니다.`);
+  if(canon&&file&&!file.includes(canon))
+    warns.push(`${esc(chName)}의 정본은 <b>「${esc(canon)}」</b> 파일입니다. 지금 파일명은 「${esc(file)}」입니다 — 다른 자료를 올리는 것이 아닌지 확인해 주세요.`);
+  if(cur.n&&Math.abs(cur.q-neu.q)<1 && Math.abs(cur.g-neu.g)>Math.max(cur.g,neu.g)*0.05)
+    warns.push(`수량은 같은데 <b>금액만 다릅니다</b> (${won(cur.g)} → ${won(neu.g)}). 같은 거래를 <b>다른 금액 기준</b>으로 읽고 있을 수 있습니다 — 정산금액인지 소비자판매가인지 확인해 주세요.`);
+  return {cur,neu,warns,chk};
+}
+function suConfirmDialog(info,chName,ym){
+  return new Promise(res=>{
+    let m=$('suPreMask');
+    if(!m){m=document.createElement('div');m.id='suPreMask';
+      m.style.cssText='position:fixed;inset:0;background:rgba(15,42,63,.45);display:none;align-items:center;justify-content:center;z-index:58;padding:20px';
+      m.innerHTML='<div class="modal" id="suPreBox" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);padding:22px;max-width:560px;width:100%;max-height:88vh;overflow:auto"></div>';
+      document.body.appendChild(m);}
+    const d=info.neu.g-info.cur.g;
+    $('suPreBox').innerHTML=`
+      <b style="font-size:16px">적재 전 확인 — ${esc(chName)} ${esc(ym)}</b>
+      <table style="width:100%;margin:12px 0;font-size:12.5px;border-collapse:collapse">
+        <thead><tr style="color:var(--ink3)"><th class="l"></th><th>행</th><th>수량</th><th>금액</th></tr></thead>
+        <tbody>
+          <tr><td class="l">기존</td><td>${won(info.cur.n)}</td><td>${won(info.cur.q)}</td><td>${won(info.cur.g)}</td></tr>
+          <tr><td class="l"><b>신규</b></td><td><b>${won(info.neu.n)}</b></td><td><b>${won(info.neu.q)}</b></td><td><b>${won(info.neu.g)}</b></td></tr>
+          <tr style="border-top:1px solid var(--line1)"><td class="l">차이</td><td>${won(info.neu.n-info.cur.n)}</td><td>${won(info.neu.q-info.cur.q)}</td>
+            <td style="font-weight:700;color:${d<0?'var(--blocked)':'var(--brand-ink)'}">${d>0?'+':''}${won(d)}</td></tr>
+        </tbody></table>
+      ${info.cur.files.length?`<div class="muted" style="font-size:11.5px;margin-bottom:8px">기존 파일: ${esc(info.cur.files.join(' · '))}</div>`:''}
+      ${info.warns.map(w=>`<div style="background:#FDF1DE;border:1px solid #F5D98B;border-radius:9px;padding:10px 12px;font-size:12px;color:#7A4A06;margin-bottom:8px;line-height:1.55">${w}</div>`).join('')}
+      ${info.cur.n?`<p class="hint" style="margin:0 0 12px">「진행」을 누르면 기존 <b>${won(info.cur.n)}행</b>을 지우고 새로 넣습니다. 지운 내용은 복구할 수 있게 보관됩니다.</p>`:''}
+      <div style="display:flex;gap:8px"><button class="btn primary" id="suPreGo">진행</button><button class="btn" id="suPreNo">취소</button></div>`;
+    m.style.display='flex';
+    $('suPreGo').onclick=()=>{m.style.display='none';res(true);};
+    $('suPreNo').onclick=()=>{m.style.display='none';res(false);};
+  });
+}
 $('suSave')&&($('suSave').onclick=async()=>{
   const ch=$('suChannel').value,ym=$('suYm').value,st=$('suType').value;
   if(!ch||!ym||!SU.rows.length)return;
-  const btn=$('suSave');btn.disabled=true;btn.textContent='저장 중…';
+  const btn=$('suSave');btn.disabled=true;btn.textContent='대조 중…';
+  const forms=[...new Set(SU.rows.map(r=>r.deal_form).filter(Boolean))];
+  let pre;
+  try{pre=await suPreflight(ch,ym,forms,SU.rows,SU.file);}
+  catch(e){btn.disabled=false;btn.textContent='정산 원장에 저장';$('suMsg').innerHTML='<span style="color:var(--blocked)">대조 실패 — '+esc(dbMsg(e))+'</span>';return;}
+  const go=await suConfirmDialog(pre,BCH[ch]||'',ym);
+  if(!go){btn.disabled=false;btn.textContent='정산 원장에 저장';$('suMsg').textContent='취소했습니다.';return;}
+  btn.textContent='저장 중…';
   try{
     if($('suReplace').checked){
-      const forms=[...new Set(SU.rows.map(r=>r.deal_form).filter(Boolean))];
+      // 지우기 전에 보관 — 잘못 덮었을 때 되돌릴 수 있게
+      try{await sb.rpc('hs_settle_backup_before_replace',
+        {p_channel:ch,p_ym:ym,p_form:forms.length===1?forms[0]:null,
+         p_reason:`업로드 교체: ${SU.file} (${(ME&&ME.name)||''})`});}catch(_){}
       let q=sb.from('hs_settle_raw').delete().eq('channel_id',ch).eq('settle_month',ym);
       if(forms.length===1)q=q.eq('deal_form',forms[0]);       // 직매입 파일이 위수탁분을 지우지 않도록
       const {error:de}=await q;
@@ -2478,7 +2542,13 @@ $('suSave')&&($('suSave').onclick=async()=>{
       const {error}=await sb.from('hs_settle_raw').insert(payload.slice(i,i+200));
       if(error)throw error;
     }
-    act('write','upload','hs_settle_raw',{ch:BCH[ch]||null,ym,rows:payload.length,file:SU.file},'lead');
+    try{await sb.from('hs_settle_batch').update({status:'superseded'}).eq('channel_id',ch).eq('settle_month',ym).eq('status','active');
+        await sb.from('hs_settle_batch').insert({tenant_id:WF_TENANT,channel_id:ch,settle_month:ym,
+          deal_form:forms.length===1?forms[0]:null,source_file:SU.file,checksum:pre.chk,
+          row_count:payload.length,gross_sum:pre.neu.g,replaced_rows:pre.cur.n,replaced_gross:pre.cur.g,
+          loaded_by:(ME&&ME.name)||$('who').textContent});}catch(_){}
+    act('write','upload','hs_settle_raw',{ch:BCH[ch]||null,ym,rows:payload.length,file:SU.file,
+      replaced:pre.cur.n,delta:pre.neu.g-pre.cur.g},'lead');
     toast(`${ym} ${BCH[ch]||''} 정산 ${payload.length}행 저장`,'ok');
     $('suMsg').innerHTML='<span style="color:#0f9d58">저장 완료 — 결산·검수에 반영됐습니다</span>';
     $('suPrev').innerHTML='';$('suFile').value='';$('suSetup').classList.add('hidden');SU.rows=[];

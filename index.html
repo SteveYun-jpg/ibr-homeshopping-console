@@ -4283,10 +4283,15 @@ function pickBrandName(){const id=$('fBrand')?$('fBrand').value:'';const b=BRAND
 // 상단 브랜드가 바뀌면 라인 목록을 채운다 (구성 피커는 이 선택을 상속)
 function fillLineTop(keep){const el=$('fLineTop');if(!el)return;const bn=pickBrandName();
   const cur=keep?el.value:'';
-  let lines=[...new Set(PICKP.filter(p=>p.brand===bn&&p.line).map(p=>p.line))];
-  if(!lines.length){   // 품목 없는 브랜드(대행 등) — 프리셋·라인규칙에서 라인명을 가져옴
-    lines=[...new Set([...PRESETS.filter(p=>p.brand_name===bn&&p.line).map(p=>p.line),...(LINE_RULE_NAMES[bn]?[...LINE_RULE_NAMES[bn]]:[])].filter(Boolean))];
-  }
+  // SCM 품목 라인 + 콘솔에서 등록한 라인을 함께 보여준다.
+  // (예전에는 SCM 라인이 하나라도 있으면 콘솔 등록 라인을 통째로 무시해서,
+  //  운영대행 브랜드에 라인을 추가해도 편성에서 선택할 수 없었다)
+  const lines=[...new Set([
+    ...PICKP.filter(p=>p.brand===bn&&p.line).map(p=>p.line),
+    ...PRESETS.filter(p=>p.brand_name===bn&&p.line).map(p=>p.line),
+    ...(LINE_RULE_NAMES[bn]?[...LINE_RULE_NAMES[bn]]:[]),
+    ...(BRAND_LINES_USED[bn]||[])
+  ].filter(Boolean))];
   lines.sort();
   el.innerHTML='<option value="">라인 선택</option>'+lines.map(ln=>`<option value="${esc(ln)}">${esc(stripLine(ln,bn))}</option>`).join('');
   if(keep&&lines.includes(cur))el.value=cur;

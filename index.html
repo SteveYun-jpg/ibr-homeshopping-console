@@ -278,6 +278,42 @@ tbody tr:hover{background:var(--bg1)}
 .modal h3{margin:0 0 6px;font-size:17px;color:var(--ink1)}.modal p{margin:0 0 18px;color:var(--ink3);font-size:13px;line-height:1.6}
 .modal .msg{margin-top:12px;font-size:12.5px;color:var(--brand-ink)}.modal .msg.err{color:var(--blocked)}
 .muted{color:var(--ink3);font-size:12.5px}
+/* ===== 아커 (업무 도우미) ===== */
+#ackerBtn{display:flex;align-items:center;gap:8px;margin-top:6px;padding:10px 12px;border-radius:var(--ri);
+  background:rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:700;cursor:pointer;border:0;width:100%;font-family:inherit}
+#ackerBtn:hover{background:rgba(255,255,255,.26)}
+body.collapsed #ackerBtn .lbx{display:none}
+body.collapsed #ackerBtn{justify-content:center;padding:10px 0}
+#acker{position:fixed;top:0;right:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--line1);
+  box-shadow:-8px 0 28px rgba(15,42,63,.10);z-index:44;display:none;flex-direction:column;transition:width .2s ease}
+body.acker-open #acker{display:flex}
+body.acker-open main{padding-right:398px}
+body.acker-max #acker{width:calc(100% - 226px);border-left:1px solid var(--line1)}
+body.acker-max.collapsed #acker{width:calc(100% - 66px)}
+body.acker-max main{padding-right:30px}
+#acker .ah{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line1);background:var(--bg1)}
+#acker .ah b{font-size:14px;color:var(--ink1)}
+#acker .ab{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+#acker .af{border-top:1px solid var(--line1);padding:10px 12px}
+#acker .row{display:flex;gap:8px;align-items:flex-end}
+#acker textarea{flex:1;border:1px solid var(--line1);border-radius:var(--ri);padding:9px 11px;font-family:inherit;
+  font-size:13px;resize:none;height:40px;outline:0}
+#acker textarea:focus{border-color:var(--brand)}
+.ak-me{align-self:flex-end;max-width:86%;background:var(--bg2);color:var(--ink2);border-radius:12px 12px 3px 12px;padding:9px 12px;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.ak-ai{align-self:flex-start;max-width:94%;background:var(--brand-soft);color:#0B5F55;border-radius:12px 12px 12px 3px;padding:10px 12px;font-size:13px;line-height:1.62;white-space:pre-wrap}
+.ak-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ak-act button{border:1px solid #9FE1CB;background:#fff;color:var(--brand-ink);border-radius:var(--pill);
+  padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ak-act button:hover{background:var(--brand-soft)}
+.ak-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.ak-chips button{border:1px dashed var(--line1);background:var(--surface);color:var(--ink3);border-radius:var(--pill);
+  padding:5px 11px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.ak-chips button:hover{border-color:var(--brand);color:var(--brand-ink)}
+.ak-src{margin-top:7px;padding-top:7px;border-top:1px dashed #9FE1CB;font-size:11px;color:#0F766E;opacity:.85}
+@media(max-width:760px){
+  #acker{width:100%!important;border-left:0}
+  body.acker-open main{padding-right:11px}
+}
 /* ===== 모바일 (≤760px) ===== */
 #mtop{display:none}
 @media(max-width:760px){
@@ -399,6 +435,7 @@ tbody tr:hover{background:var(--bg1)}
       <div class="gl">관리자</div>
       <div class="nav" data-v="members" data-t="직원 관리"><span class="lb">직원 관리</span></div>
     </div>
+    <button id="ackerBtn" title="아커 — 업무 도우미"><span aria-hidden="true">✦</span><span class="lbx">아커</span></button>
     <div class="devreq" id="reqSideBtn" title="개발요청"><span class="lbx">개발요청</span></div>
     <div class="devreq" id="noticeSideBtn" title="업데이트 공지 다시 보기" style="margin-top:6px"><span class="lbx">업데이트</span></div>
     <div class="refbadges" id="refBadges">
@@ -926,6 +963,24 @@ tbody tr:hover{background:var(--bg1)}
     </div>
   </div>
 </div>
+<aside id="acker" aria-label="아커 업무 도우미">
+  <div class="ah">
+    <span style="color:var(--brand);font-size:15px">✦</span>
+    <b>아커</b>
+    <span class="muted" id="ackerWho" style="font-size:11px"></span>
+    <div class="spacer"></div>
+    <button class="btn sm" id="ackerMax" title="크게 보기">⤢</button>
+    <button class="btn sm" id="ackerClose" title="닫기">✕</button>
+  </div>
+  <div class="ab" id="ackerBody"></div>
+  <div class="af">
+    <div class="ak-chips" id="ackerChips"></div>
+    <div class="row">
+      <textarea id="ackerInput" placeholder="무엇을 도와드릴까요? (예: PPL 어디서 입력해요?)"></textarea>
+      <button class="btn primary" id="ackerSend" style="height:40px;padding:0 16px">보내기</button>
+    </div>
+  </div>
+</aside>
 <div class="mask" id="qNoticeMask" style="position:fixed;inset:0;background:rgba(15,42,63,.45);display:none;align-items:center;justify-content:center;z-index:59;padding:20px">
   <div class="modal" style="background:var(--surface);border-radius:16px;box-shadow:var(--shm);max-width:600px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="background:#0F2A3F;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:9px">
@@ -1447,7 +1502,11 @@ function applyMemberGate(){
   // 워크플로우: 준비 중이라 대표 계정에서만 노출 (팀원 혼선 방지)
   const wn=$('wfNav');if(wn)wn.style.display=wfAllowed()?'':'none';
   if(!wfAllowed()){const wv=$('v-workflow');if(wv)wv.remove();}   // 직원 화면에는 흔적도 남기지 않는다
-  if(AUTHED&&ok)questPing();
+  if(AUTHED&&ok){questPing();
+    try{const m=localStorage.getItem('hsAcker');
+      if(m==='2'){document.body.classList.add('acker-max');akOpen(true);$('ackerMax').textContent='⤡';}
+      else if(m==='1')akOpen(true);}catch(_){}
+  }
 }
 // 로그인 시 업무 지시 알림 (배지 + 배너)
 async function questPing(){
@@ -1866,6 +1925,119 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   if(settleMode==='monthly'){await loadSalesBasis();return;}   // 영업기준 = 방송월 귀속(방송한 달로 집계)
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
+
+// ===== 아커 — 업무 도우미 =====
+// 1단계: 규칙 기반(사전답변 + 메뉴 안내). LLM 호출 없음 → 비용 0.
+const AK_VIEWS=[
+  {v:'home',n:'대시보드',k:['대시보드','메인','홈','현황']},
+  {v:'broadcast',n:'방송 스케줄',k:['방송','편성','스케줄','캘린더','실적','콜','틱']},
+  {v:'settle',n:'자사 결산',k:['자사결산','자사 결산','결산','정산','회계마감','영업기준','부가세','검수']},
+  {v:'agency',n:'대행 결산',k:['대행','대행결산','대행사','수수료','청구']},
+  {v:'config',n:'라인·세트 구성',k:['라인','세트','구성','프리셋','판매가']},
+  {v:'ppl',n:'PPL 프로그램',k:['ppl','피피엘','프로그램']},
+  {v:'sim',n:'시뮬레이션',k:['시뮬','시뮬레이션','예측','역추천']},
+  {v:'quest',n:'업무 지시',k:['업무','지시','할일','보고','퀘스트']},
+  {v:'survey',n:'의견 설문',k:['설문','의견']},
+  {v:'channels',n:'홈쇼핑사',k:['홈쇼핑사','홈사','정액비','수수료율']},
+  {v:'brands',n:'브랜드 관리',k:['브랜드']},
+  {v:'products',n:'상품구성 SKU',k:['sku','상품','재고','부자재','발주']},
+  {v:'members',n:'직원 관리',k:['직원','계정','승인','비밀번호']}
+];
+let AK={faq:[],conv:null,busy:false,greeted:false};
+const akNorm=t=>String(t||'').toLowerCase().replace(/[\s\p{P}]/gu,'');
+function akEsc(t){return esc(t).replace(/\n/g,'<br>');}
+function akPush(role,html,actions,sources){
+  const b=$('ackerBody');const d=document.createElement('div');
+  d.className=role==='me'?'ak-me':'ak-ai';
+  d.innerHTML=html+(sources?`<div class="ak-src">근거 · ${esc(sources)}</div>`:'');
+  if(actions&&actions.length){
+    const w=document.createElement('div');w.className='ak-act';
+    actions.forEach(a=>{const bt=document.createElement('button');bt.textContent=a.label;
+      bt.onclick=()=>{if(a.view){navTo(a.view);if(window.innerWidth<1100)akOpen(false);}else if(a.ask)akAsk(a.ask);};
+      w.appendChild(bt);});
+    d.appendChild(w);
+  }
+  b.appendChild(d);b.scrollTop=b.scrollHeight;return d;
+}
+function akChips(list){
+  const c=$('ackerChips');c.innerHTML='';
+  (list||[]).forEach(t=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>akAsk(t);c.appendChild(b);});
+}
+async function akLoadFaq(){if(AK.faq.length)return;
+  const {data}=await sb.from('acker_faq').select('*').eq('active',true);AK.faq=data||[];}
+function akMatchFaq(q){
+  const n=akNorm(q);let best=null,score=0;
+  AK.faq.forEach(f=>{
+    let sc=0;(f.keywords||[]).forEach(k=>{if(n.includes(akNorm(k)))sc+=2;});
+    if(akNorm(f.question).includes(n)&&n.length>3)sc+=3;
+    if(sc>score){score=sc;best=f;}});
+  return score>=2?best:null;
+}
+function akMatchView(q){
+  const n=akNorm(q);let best=null,score=0;
+  AK_VIEWS.forEach(v=>{let sc=0;v.k.forEach(k=>{if(n.includes(akNorm(k)))sc+=1;});
+    if(sc>score){score=sc;best=v;}});
+  return score>0?best:null;
+}
+async function akEnsureConv(){
+  if(AK.conv||!ME||!ME.user_id)return AK.conv;
+  const {data}=await sb.from('acker_conversation').insert({tenant_id:WF_TENANT,user_id:ME.user_id,title:'대화'}).select('id').maybeSingle();
+  AK.conv=data&&data.id;return AK.conv;
+}
+async function akSave(role,content,tier,actions,sources){
+  try{const cid=await akEnsureConv();if(!cid)return;
+    await sb.from('acker_message').insert({conversation_id:cid,role:role==='me'?'user':'acker',
+      content,tier:tier||null,actions:actions||null,sources:sources||null});}catch(_){}
+}
+async function akAsk(q){
+  q=(q||'').trim();if(!q||AK.busy)return;
+  AK.busy=true;$('ackerInput').value='';
+  akPush('me',akEsc(q));akSave('me',q);
+  await akLoadFaq();
+  try{await sb.rpc('acker_log_question',{p_q:q,p_module:'hs'});}catch(_){}
+  const f=akMatchFaq(q);
+  if(f){
+    akPush('ai',akEsc(f.answer),f.actions||[],null);
+    akSave('acker',f.answer,'rule',f.actions);
+    try{await sb.from('acker_faq').update({hits:(f.hits||0)+1}).eq('id',f.id);}catch(_){}
+    AK.busy=false;return;
+  }
+  const v=akMatchView(q);
+  if(v){
+    const t=`「${v.n}」 화면에서 하실 수 있습니다. 아래 버튼을 누르면 바로 이동합니다.`;
+    akPush('ai',akEsc(t),[{label:v.n+' 열기',view:v.v}]);
+    akSave('acker',t,'rule',[{label:v.n,view:v.v}]);
+    AK.busy=false;return;
+  }
+  const t='아직 제가 답할 수 있는 범위 밖입니다. 곧 콘솔 데이터를 직접 찾아 답하도록 넓히고 있습니다.\n지금은 아래처럼 물어봐 주세요 — 화면 위치와 업무 처리 방법은 바로 안내해 드립니다.';
+  akPush('ai',akEsc(t),[{label:'PPL 어디서 입력해요?',ask:'PPL 어디서 입력해요?'},{label:'구성 판매가 어떻게 넣어요?',ask:'구성 판매가 어떻게 넣어요?'}]);
+  akSave('acker',t,'rule');
+  AK.busy=false;
+}
+function akOpen(on){
+  document.body.classList.toggle('acker-open',on!==false);
+  if(on===false)document.body.classList.remove('acker-max');
+  if(on!==false){
+    if(window.innerWidth<1400)document.body.classList.add('collapsed');
+    akGreet();setTimeout(()=>$('ackerInput').focus(),120);
+  }
+  try{localStorage.setItem('hsAcker',on===false?'0':(document.body.classList.contains('acker-max')?'2':'1'));}catch(_){}
+}
+async function akGreet(){
+  if(AK.greeted)return;AK.greeted=true;
+  await akLoadFaq();
+  const nm=(ME&&ME.name)||'';
+  $('ackerWho').textContent=[nm,(ME&&ME.grade)||''].filter(Boolean).join(' · ');
+  akPush('ai',akEsc(`${nm?nm+'님, ':''}안녕하세요. 아커입니다.\n메뉴 위치와 업무 처리 방법을 안내해 드립니다. 아래를 눌러보셔도 되고, 그냥 편하게 물어보셔도 됩니다.`));
+  akChips(AK.faq.slice(0,6).map(f=>f.question));
+}
+$('ackerBtn')&&($('ackerBtn').onclick=()=>akOpen(!document.body.classList.contains('acker-open')));
+$('ackerClose')&&($('ackerClose').onclick=()=>akOpen(false));
+$('ackerMax')&&($('ackerMax').onclick=()=>{const m=document.body.classList.toggle('acker-max');
+  $('ackerMax').textContent=m?'⤡':'⤢';try{localStorage.setItem('hsAcker',m?'2':'1');}catch(_){}});
+$('ackerSend')&&($('ackerSend').onclick=()=>akAsk($('ackerInput').value));
+$('ackerInput')&&$('ackerInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();akAsk($('ackerInput').value);}});
 
 // ===== 업무 지시 (지시 → 보고 → 확인) · co_work_request 기반 =====
 const Q_STATUS={open:['지시','#F59E0B','#FEF3C7'],doing:['진행중','#3B82F6','#E0F2FE'],reported:['보고 완료 · 확인대기','#0D9488','#D6F5EC'],done:['확인 완료','#10B981','#D1FAE5'],canceled:['취소','#94A3B8','var(--bg2)']};

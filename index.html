@@ -602,6 +602,7 @@ body.acker-max main{padding-right:30px}
               <span class="muted" style="font-size:11.5px">홈사 정산서(과면세 확인 등) 엑셀을 올리면 표를 읽어 정산 원장에 넣습니다.</span>
             </div>
             <div id="suSetup" class="hidden" style="margin-top:12px;border-top:1px solid var(--line1);padding-top:12px">
+              <div id="suPresetBox" class="hidden" style="margin-bottom:12px"></div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
                 <div><label class="muted" style="font-size:11px">시트</label><select id="suSheet" style="min-width:140px"></select></div>
                 <div><label class="muted" style="font-size:11px">헤더 행</label><input id="suHeaderRow" type="number" min="1" value="1" style="width:70px"></div>
@@ -2319,7 +2320,66 @@ const SU_FIELDS=[
   ['media','매체',false,[/매체/,/채널구분/,/방송구분/]],
   ['deal_form','거래유형(직매입/위수탁)',false,[/매입유형/,/거래유형/,/직매입/,/위수탁/]]
 ];
-let SU={wb:null,file:'',grid:[],hdr:[],map:{},rows:[],brands:[]};
+// 홈사 원본 양식 프리셋 — SCM에서 그대로 내려받은 파일을 손대지 않고 읽는다.
+// 주문 단위 파일은 품목 단위로 합쳐서 넣는다(집계키 기준). 회계마감 금액은 홈사마다 계산식이 다르다.
+const SU_PRESETS=[
+ {id:'lotte', name:'롯데홈쇼핑 주문내역', ch:'롯데홈쇼핑', sig:['순번','주문번호','상품대금'],
+  key:['상품코드','단품','과세'], deal:'위수탁',
+  txt:{product_code:'상품코드',unit_code:'단품',product_name:'상품명',tax_type:'과세'},
+  sum:{qty:'수량',sellout_amount:'판매금액',gross_amount:'상품대금',commission_amt:'수수료금액'},
+  note:'상품대금 = 회계마감기준 · 판매금액 = 영업기준(실제 결제액)'},
+
+ {id:'lotte_vat', name:'롯데홈쇼핑 과면세 확인', ch:'롯데홈쇼핑', sig:['일반판매매입금액','정산금액합계','매입구분'],
+  key:['상품코드','단품','과세구분','매입구분'],
+  txt:{product_code:'상품코드',unit_code:'단품',product_name:'상품명',tax_type:'과세구분',
+       media:'매체구분',vendor:'하위벤더명',deal_form:'매입구분'},
+  sum:{qty:'합계',gross_amount:'정산금액합계'}, first:{unit_price:'판매단가',unit_cost:'매입단가'},
+  calc:r=>{if(r.unit_price&&r.qty)r.sellout_amount=Math.round(r.unit_price*r.qty);},
+  note:'정산금액합계 = 회계마감기준 · 영업기준은 판매단가×수량으로 추정합니다(할인 미반영). 실제 결제액이 필요하면 주문내역 파일을 받아주세요'},
+
+ {id:'hyundai', name:'현대홈쇼핑 주문내역', ch:'현대홈쇼핑', sig:['판매상품코드','매입방법','매출원가'],
+  key:['판매상품코드','속성코드','과세구분'], deal:'위수탁',
+  txt:{product_code:'판매상품코드',unit_code:'속성코드',product_name:'판매상품명',tax_type:'과세구분',media:'배송형태'},
+  sum:{qty:'수량',gross_amount:'매출원가',sellout_amount:'판매가'}, first:{unit_price:'판매단가'}, noTotal:true,
+  note:'매출원가 = 회계마감기준(홈사 지급액) · 판매가 = 영업기준'},
+
+ {id:'hyundai_old', name:'현대홈쇼핑 과면세 확인(구 양식)', ch:'현대홈쇼핑',
+  sig:['납품계(VAT제외)','판매계(VAT포함)','입고No.'],
+  key:['상품코드','속성코드','과세구분','매입방법'],
+  txt:{product_code:'상품코드',unit_code:'속성코드',product_name:'상품명',tax_type:'과세구분',
+       media:'배송형태',deal_form:'매입방법'},
+  sum:{qty:'수량',gross_amount:'납품계(VAT제외)',sellout_amount:'판매계(VAT포함)'}, first:{unit_price:'판매단가',unit_cost:'납품단가'}, noTotal:true,
+  note:'2025년 상반기까지 쓰던 양식 · 납품계 = 회계마감기준 · 판매계 = 영업기준'},
+
+ {id:'cj', name:'CJ온스타일 수수료매출 주문번호별내역', ch:'CJ온스타일', sig:['상품대금지급예정액(공제전)','옵션코드','매출량'], hdr2:true,
+  key:['상품코드','옵션코드','과세구분','채널구분'], deal:'위수탁',
+  txt:{product_code:'상품코드',unit_code:'옵션코드',product_name:'판매상품명',tax_type:'과세구분',media:'채널구분'},
+  sum:{qty:'매출량',gross_amount:'상품대금지급예정액(공제전)',sellout_amount:'소비자판매가',commission_amt:'CJ수수료'},
+  first:{unit_price:'원판매가'}, rate:'수수료율(%)',
+  note:'헤더가 2줄로 병합된 양식 · 상품대금지급예정액 = 회계마감기준'},
+
+ {id:'gs', name:'GS SHOP 상품별 정산', ch:'GS SHOP', sig:['상품상세코드','지급예정액','LOSS수량'],
+  key:['상품상세코드','과세면세'], deal:'직매입',
+  txt:{product_code:'상품상세코드',product_name:'상품명',tax_type:'과세면세',media:'배송형태'},
+  sum:{qty:'합계',gross_amount:'지급예정액',sellout_amount:'판매금액'},
+  note:'직매입 — 지급예정액(= 최종원가) = 회계마감기준'},
+
+ {id:'ns_com', name:'NS홈쇼핑 위수탁', ch:'NS홈쇼핑', sig:['소비자판매액','수수료율','최종 수수료매출/'],
+  key:['상품코드','단품코드','매체','원가유형'], deal:'위수탁',
+  txt:{product_code:'상품코드',unit_code:'단품코드',product_name:'상품명',tax_type:'과세구분',media:'매체'},
+  sum:{qty:'판매수량',sellout_amount:'소비자판매액',commission_amt:'최종 수수료매출/'},
+  first:{unit_price:'매가'}, rate:'수수료율',
+  calc:r=>{r.gross_amount=Math.round((r.sellout_amount||0)-(r.commission_amt||0));},
+  note:'회계마감 = 소비자판매액 − 최종 수수료매출(NS부담 할인 반영). 단순 「수수료매출」을 쓰면 과소계상됩니다'},
+
+ {id:'ns_dir', name:'NS홈쇼핑 직매입(특약매입)', ch:'NS홈쇼핑', sig:['원가(VAT)별도','매출금액','반품금액'],
+  key:['상품코드','단품코드','매체','제휴사'], deal:'직매입',
+  txt:{product_code:'상품코드',unit_code:'단품코드',product_name:'상품명',tax_type:'과세구분',media:'매체',vendor:'제휴사'},
+  sum:{_qs:'매출수량',_qr:'반품수량',_gs:'매출금액',return_amount:'반품금액'}, first:{unit_cost:'원가(VAT)별도'},
+  calc:r=>{r.qty=(r._qs||0)-(r._qr||0);r.gross_amount=Math.round((r._gs||0)-(r.return_amount||0));delete r._qs;delete r._qr;delete r._gs;},
+  note:'반품을 차감한 순액으로 넣습니다 · 직매입은 소비자판매가가 없어 영업기준은 비워둡니다'}
+];
+let SU={wb:null,file:'',grid:[],hdr:[],map:{},rows:[],brands:[],preset:null,usePreset:true};
 function suNum(v){if(v==null||v==='')return null;if(typeof v==='number')return v;
   const s=String(v).replace(/[,\s원₩]/g,'').replace(/\((.*)\)/,'-$1');const n=parseFloat(s);return isNaN(n)?null:n;}
 function suNorm(s){return String(s==null?'':s).replace(/[\s\n\r]/g,'');}
@@ -2339,6 +2399,121 @@ function suGuessHeaderRow(grid){
     if(hit>=2)return r+1;
   }
   return 1;}
+// ── 프리셋 감지 ────────────────────────────────────────────────
+function suCol(hdr,label){
+  const t=suNorm(label);if(!t)return -1;
+  for(let i=0;i<hdr.length;i++)if(suNorm(hdr[i])===t)return i;      // 정확히 같은 이름 우선
+  for(let i=0;i<hdr.length;i++){const h=suNorm(hdr[i]);if(h&&h.includes(t))return i;}
+  return -1;
+}
+function suSniff(wb){
+  for(const p of SU_PRESETS){
+    for(const sn of wb.SheetNames){
+      if(p.sheet&&!p.sheet.test(sn))continue;
+      const grid=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+      for(let r=0;r<Math.min(grid.length,10);r++){
+        const main=grid[r]||[];
+        // 제목 한 줄짜리 행을 헤더로 착각하지 않도록 — 실제 헤더는 칸이 여럿 차 있다
+        if(main.filter(c=>c!=null&&c!=='').length<3)continue;
+        const hdr=p.hdr2?(main.map((c,i)=>{const s=(grid[r+1]||[])[i];return (s==null||s==='')?c:s;})):main;
+        if(p.sig.every(s=>suCol(hdr,s)>=0))
+          return {preset:p,sheet:sn,grid,hdr,dataFrom:r+(p.hdr2?2:1),hdrRow:r+1};
+      }
+    }
+  }
+  return null;
+}
+function suPresetBanner(){
+  const box=$('suPresetBox');if(!box)return;
+  if(!SU.preset){box.classList.add('hidden');box.innerHTML='';return;}
+  const p=SU.preset.preset;
+  box.classList.remove('hidden');
+  box.innerHTML=SU.usePreset
+   ? `<div style="background:#E8F5EC;border:1px solid #A8D8B9;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#14532D;line-height:1.6">
+        <b>「${esc(p.name)}」 양식으로 읽습니다.</b> 컬럼 연결·집계를 자동으로 맞췄으니 그대로 미리보기를 누르시면 됩니다.
+        <div style="font-size:11.5px;margin-top:3px;color:#3F6B4E">${esc(p.note)} · 주문 단위 행은 품목별로 합쳐서 넣습니다.</div>
+        <button class="btn sm" id="suPresetOff" style="margin-top:8px">직접 연결할게요</button>
+      </div>`
+   : `<div style="background:#FDF1DE;border:1px solid #F5D98B;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#7A4A06;line-height:1.6">
+        직접 연결 모드입니다. 이 파일은 <b>「${esc(p.name)}」</b> 양식으로 인식됐습니다 — 자동으로 읽는 편이 안전합니다.
+        <button class="btn sm" id="suPresetOn" style="margin-top:8px">양식대로 읽기</button>
+      </div>`;
+  const on=$('suPresetOn'),off=$('suPresetOff');
+  if(off)off.onclick=()=>{SU.usePreset=false;suPresetBanner();suLoadSheet();$('suSave').disabled=true;$('suPrev').innerHTML='';};
+  if(on)on.onclick=()=>{SU.usePreset=true;suApplyPreset();$('suSave').disabled=true;$('suPrev').innerHTML='';};
+}
+function suApplyPreset(){
+  const d=SU.preset;if(!d)return;
+  $('suSheet').value=d.sheet;
+  SU.grid=d.grid;SU.hdr=d.hdr;
+  $('suHeaderRow').value=d.hdrRow;
+  $('suMap').innerHTML=`<div class="muted" style="font-size:11.5px;grid-column:1/-1">양식에서 자동으로 연결됩니다 — 「직접 연결할게요」를 누르면 수동으로 바꿀 수 있습니다.</div>`;
+  suPresetBanner();
+}
+// 프리셋 추출 — 주문 단위 행을 집계키로 묶어 품목 단위로 만든다
+function suExtractPreset(){
+  const d=SU.preset,p=d.preset,hdr=d.hdr;
+  const ix={},skipped={sum:0,empty:0};
+  const grab=o=>{const m={};for(const k in o)m[k]=suCol(hdr,o[k]);return m;};
+  ix.txt=grab(p.txt||{});ix.sum=grab(p.sum||{});ix.first=grab(p.first||{});
+  const rateIx=p.rate?suCol(hdr,p.rate):-1;
+  const keyIx=(p.key||[]).map(k=>suCol(hdr,k));
+  const nameIx=ix.txt.product_name;
+  const g=new Map();
+  let tot=null,totScore=-1;      // 파일이 스스로 적어둔 합계행 — 우리가 읽은 값과 대조한다
+  // 「합계」뿐 아니라 「일별 계」「팀 계」「페이지계」 같은 중간 소계도 데이터로 세면 안 된다
+  const SUMRE=/^[가-힣A-Za-z0-9]{0,6}(합계|소계|총계|계)$/;
+  for(let r=d.dataFrom;r<d.grid.length;r++){
+    const row=d.grid[r]||[];
+    const isSum=row.some((c,i)=>i!==nameIx&&typeof c==='string'&&SUMRE.test(suNorm(c)));
+    const nm=nameIx>=0?String(row[nameIx]==null?'':row[nameIx]).trim():'';
+    if(isSum||!nm){
+      if(!p.noTotal){
+        const t={};let score=0;
+        for(const k in ix.sum){const i=ix.sum[k];if(i>=0){const v=suNum(row[i]);if(v!=null&&v!==0){t[k]=v;score++;}else t[k]=0;}}
+        if(score){const mag=Math.abs(t.gross_amount||t.sellout_amount||0);
+          if(mag>totScore){if(p.calc)p.calc(t);tot=t;totScore=mag;}}   // 중간 소계가 아니라 가장 큰 총계를 고른다
+      }
+      isSum?skipped.sum++:skipped.empty++;
+      continue;
+    }
+    const kk=keyIx.map(i=>i>=0?String(row[i]==null?'':row[i]).trim():'').join('');
+    let rec=g.get(kk);
+    if(!rec){
+      rec={product_name:nm,deal_form:p.deal||null};
+      for(const k in ix.txt){if(k==='product_name')continue;const i=ix.txt[k];
+        if(i>=0&&row[i]!=null&&row[i]!==''){let v=String(row[i]).trim();
+          if(k==='tax_type')v=/면/.test(v)?'면세':(/과/.test(v)?'과세':null);
+          if(k==='deal_form')v=/직매입/.test(v)?'직매입':(/위탁|위수탁|특약/.test(v)?'위수탁':null);
+          if(v)rec[k]=v;}}
+      for(const k in ix.first){const i=ix.first[k];if(i>=0){const v=suNum(row[i]);if(v!=null)rec[k]=Math.round(v);}}
+      if(rateIx>=0){const v=suNum(row[rateIx]);if(v!=null)rec.commission_rate=v>1?v/100:v;}
+      for(const k in ix.sum)rec[k]=0;
+      g.set(kk,rec);
+    }
+    for(const k in ix.sum){const i=ix.sum[k];if(i>=0){const v=suNum(row[i]);if(v!=null)rec[k]+=v;}}
+  }
+  const out=[];
+  g.forEach(rec=>{
+    for(const k in rec)if(typeof rec[k]==='number'&&k!=='commission_rate')rec[k]=Math.round(rec[k]);
+    if(p.calc)p.calc(rec);
+    if(rec.gross_amount==null||!isFinite(rec.gross_amount))return;
+    if(rec.vat_amount==null)rec.vat_amount=rec.gross_amount;
+    if(rec.qty===0&&rec.gross_amount===0)return;       // 매출도 반품도 없는 행
+    out.push(rec);
+  });
+  // 파일 합계행과 대조 — 어긋나면 잘못 읽고 있다는 뜻이다
+  let check=null;
+  if(tot){
+    const mine=k=>out.reduce((a,r)=>a+(+r[k]||0),0);
+    check=['gross_amount','sellout_amount','qty'].map(k=>{
+      if(tot[k]==null)return null;
+      const a=Math.round(mine(k)),b=Math.round(tot[k]);
+      return {k,mine:a,file:b,ok:Math.abs(a-b)<=Math.max(2,Math.abs(b)*0.0001)};
+    }).filter(Boolean);
+  }
+  return {rows:out,skipped,check};
+}
 function suBuildMap(){
   const hdr=SU.hdr;
   SU.map={};
@@ -2374,16 +2549,19 @@ $('suFile')&&($('suFile').onchange=async e=>{
     $('suSheet').value=best;
     await ensureChannels();
     $('suChannel').innerHTML='<option value="">— 홈쇼핑사 선택 —</option>'+Object.entries(BCH).sort((a,z)=>String(a[1]).localeCompare(String(z[1]),'ko')).map(([id,nm])=>`<option value="${id}">${esc(nm)}</option>`).join('');
-    const ch=suDetectCh(f.name);if(ch)$('suChannel').value=ch;
+    SU.preset=suSniff(SU.wb);SU.usePreset=!!SU.preset;
+    const pch=SU.preset&&Object.keys(BCH).find(k=>BCH[k]===SU.preset.preset.ch);
+    const ch=pch||suDetectCh(f.name);if(ch)$('suChannel').value=ch;
     const ym=suDetectYm(f.name);if(ym)$('suYm').value=ym;
     if(ch){const c=(CHS||[]).find(x=>x.id===ch);if(c&&c.revenue_method)$('suType').value=c.revenue_method;}
-    suLoadSheet();
+    if(SU.preset)suApplyPreset(); else {suPresetBanner();suLoadSheet();}
     $('suSetup').classList.remove('hidden');$('suMsg').textContent='';
     $('suSave').disabled=true;$('suPrev').innerHTML='';
   }catch(err){$('suMsg').innerHTML='<span style="color:var(--blocked)">읽기 실패: '+esc(String(err))+'</span>';}
 });
-$('suSheet')&&($('suSheet').onchange=()=>{suLoadSheet();$('suSave').disabled=true;$('suPrev').innerHTML='';});
-$('suHeaderRow')&&($('suHeaderRow').onchange=()=>{SU.hdr=SU.grid[(+$('suHeaderRow').value||1)-1]||[];suBuildMap();$('suSave').disabled=true;$('suPrev').innerHTML='';});
+$('suSheet')&&($('suSheet').onchange=()=>{SU.usePreset=false;suPresetBanner();suLoadSheet();$('suSave').disabled=true;$('suPrev').innerHTML='';});
+$('suHeaderRow')&&($('suHeaderRow').onchange=()=>{if(SU.usePreset){SU.usePreset=false;suPresetBanner();}
+  SU.hdr=SU.grid[(+$('suHeaderRow').value||1)-1]||[];suBuildMap();$('suSave').disabled=true;$('suPrev').innerHTML='';});
 function suExtract(){
   const hr=(+$('suHeaderRow').value||1);
   const m=SU.map,out=[],skipped={sum:0,empty:0};
@@ -2414,7 +2592,7 @@ function suExtract(){
   return {rows:out,skipped};
 }
 async function suMatchBrands(rows){
-  if(!SU.brands.length){const {data}=await sb.from('brands').select('id,name');SU.brands=data||[];}
+  if(!SU.brands.length){const {data}=await sb.from('brands').select('id,name,deal_side');SU.brands=data||[];}
   const {data:al}=await sb.from('acct_brand_alias').select('token,brand_id');
   const alias=al||[];
   rows.forEach(r=>{
@@ -2427,16 +2605,38 @@ async function suMatchBrands(rows){
   return rows;
 }
 $('suPreview')&&($('suPreview').onclick=async()=>{
-  if(SU.map.product_name<0||SU.map.gross_amount<0){$('suMsg').innerHTML='<span style="color:var(--blocked)">★ 품목명·매출총액 컬럼을 연결해주세요</span>';return;}
-  const {rows,skipped}=suExtract();
+  const byPreset=SU.usePreset&&SU.preset;
+  if(!byPreset&&(SU.map.product_name<0||SU.map.gross_amount<0)){$('suMsg').innerHTML='<span style="color:var(--blocked)">★ 품목명·매출총액 컬럼을 연결해주세요</span>';return;}
+  const {rows,skipped,check}=byPreset?suExtractPreset():suExtract();
+  if(!rows.length){$('suMsg').innerHTML='<span style="color:var(--blocked)">읽어들인 행이 없습니다 — 시트·헤더 행을 확인해주세요</span>';return;}
   await suMatchBrands(rows);
   SU.rows=rows;
   const sum=rows.reduce((a,r)=>a+(+r.gross_amount||0),0);
   const noBrand=rows.filter(r=>!r.brand_id).length;
   $('suMsg').textContent='';
+  const LBL={gross_amount:'회계마감(정산액)',sellout_amount:'영업(소비자판매가)',qty:'수량'};
+  // 대행 정산서는 홈사가 같은 양식으로 발행하기 때문에 구조만으로는 구분되지 않는다 — 브랜드로 잡는다
+  const agBrands=[...new Set(rows.map(r=>(SU.brands.find(b=>b.id===r.brand_id)||{}))
+                             .filter(b=>b.deal_side==='대행').map(b=>b.name))];
+  const agRows=rows.filter(r=>{const b=SU.brands.find(x=>x.id===r.brand_id);return b&&b.deal_side==='대행';}).length;
+  const agHtml=agBrands.length?`<div style="background:#FCE9E9;border:1px solid #F0B4B4;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#8A1C1C;line-height:1.6;margin-bottom:10px">
+      <b>대행 브랜드가 섞여 있습니다 — 대행 정산서일 수 있습니다.</b>
+      <div style="margin-top:3px">${esc(agBrands.join(' · '))} ${won(agRows)}행. 홈사는 자사분과 대행분을 <b>같은 양식</b>으로 발행하기 때문에 파일 구조만으로는 구분되지 않습니다.</div>
+      <div style="margin-top:3px">대행 건이라면 여기가 아니라 <b>「대행 결산 › 정산서 업로드」</b>로 올려주세요.</div>
+    </div>`:'';
+  const bad=(check||[]).filter(c=>!c.ok);
+  const chkHtml=!check?'':(bad.length
+   ? `<div style="background:#FCE9E9;border:1px solid #F0B4B4;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#8A1C1C;line-height:1.6;margin-bottom:10px">
+        <b>파일의 합계행과 맞지 않습니다.</b> 이대로 넣으면 결산이 틀어집니다 — 시트·헤더 행을 확인해주세요.
+        ${bad.map(c=>`<div style="margin-top:3px">· ${LBL[c.k]||c.k} — 읽은 값 <b>${won(c.mine)}</b> / 파일 합계 <b>${won(c.file)}</b> (차이 ${won(c.mine-c.file)})</div>`).join('')}
+      </div>`
+   : `<div style="background:#E8F5EC;border:1px solid #A8D8B9;border-radius:10px;padding:10px 13px;font-size:12.5px;color:#14532D;margin-bottom:10px">
+        <b>파일 합계행과 일치합니다.</b> ${check.map(c=>`${LBL[c.k]||c.k} ${won(c.file)}`).join(' · ')}
+      </div>`);
   $('suPrev').innerHTML=`<div class="card" style="padding:14px">
+    ${agHtml}${chkHtml}
     <div class="kpis" style="margin:0 0 10px">
-      <div class="kpi brand"><div class="l">읽은 행</div><div class="v">${won(rows.length)}행</div><div class="s">합계행 ${skipped.sum} · 빈행 ${skipped.empty} 제외</div></div>
+      <div class="kpi brand"><div class="l">읽은 행</div><div class="v">${won(rows.length)}행</div><div class="s">${byPreset?'주문 단위를 품목별로 합침 · ':''}합계행 ${skipped.sum} · 빈행 ${skipped.empty} 제외</div></div>
       <div class="kpi"><div class="l">매출총액 합</div><div class="v">${eok(sum)}</div></div>
       <div class="kpi ${noBrand?'warn':''}"><div class="l">브랜드 미매칭</div><div class="v">${noBrand}행</div><div class="s">저장 후 검수에서 확인</div></div>
       <div class="kpi ${rows.filter(r=>r.sellout_amount==null).length?'warn':''}"><div class="l">소비자판매가 미입력</div><div class="v">${rows.filter(r=>r.sellout_amount==null).length}행</div><div class="s">영업기준이 정산액으로 잡힙니다</div></div>
@@ -2480,8 +2680,16 @@ async function suPreflight(ch,ym,forms,rows,file){
   const canon=hint&&hint.canonical_file_hint;
   const warns=[];
   if(dup&&dup.length)warns.push(`이 파일은 <b>이미 올라간 파일과 내용이 같습니다</b> (${String(dup[0].loaded_at).slice(0,10)} ${esc(dup[0].loaded_by||'')}). 다시 올리면 같은 내용으로 덮어씁니다.`);
-  if(canon&&file&&!file.includes(canon))
+  // 양식이 프리셋으로 확인된 경우엔 파일명까지 따지지 않는다 (홈사가 파일명을 자주 바꾼다)
+  if(!(SU.usePreset&&SU.preset)&&canon&&file&&!file.includes(canon))
     warns.push(`${esc(chName)}의 정본은 <b>「${esc(canon)}」</b> 파일입니다. 지금 파일명은 「${esc(file)}」입니다 — 다른 자료를 올리는 것이 아닌지 확인해 주세요.`);
+  const agB=[...new Set(rows.map(r=>(SU.brands.find(b=>b.id===r.brand_id)||{}))
+                          .filter(b=>b.deal_side==='대행').map(b=>b.name))];
+  if(agB.length)
+    warns.push(`<b>대행 브랜드(${esc(agB.join(' · '))})가 섞여 있습니다.</b> 대행 정산서는 홈사가 자사분과 같은 양식으로 발행합니다 — 대행 건이라면 「대행 결산 › 정산서 업로드」로 올려주세요.`);
+  const noB=rows.filter(r=>!r.brand_id).length;
+  if(noB&&noB===rows.length)
+    warns.push(`<b>브랜드가 하나도 매칭되지 않았습니다.</b> 우리 상품이 아닌 자료일 수 있습니다 — 품목명을 확인해 주세요.`);
   if(cur.n&&Math.abs(cur.q-neu.q)<1 && Math.abs(cur.g-neu.g)>Math.max(cur.g,neu.g)*0.05)
     warns.push(`수량은 같은데 <b>금액만 다릅니다</b> (${won(cur.g)} → ${won(neu.g)}). 같은 거래를 <b>다른 금액 기준</b>으로 읽고 있을 수 있습니다 — 정산금액인지 소비자판매가인지 확인해 주세요.`);
   return {cur,neu,warns,chk};

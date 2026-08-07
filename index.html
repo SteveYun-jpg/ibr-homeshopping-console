@@ -977,6 +977,9 @@ body.acker-max main{padding-right:30px}
   <div class="ab" id="ackerBody"></div>
   <div class="af">
     <div class="ak-chips" id="ackerChips"></div>
+    <label class="muted" style="display:flex;gap:5px;align-items:center;font-size:11px;margin-bottom:6px;cursor:pointer">
+      <input type="checkbox" id="ackerDeep" style="width:auto;margin:0;min-height:0"> 꼼꼼히 (원인 분석·여러 자료 대조가 필요할 때)
+    </label>
     <div class="row">
       <textarea id="ackerInput" placeholder="무엇을 도와드릴까요? (예: PPL 어디서 입력해요?)"></textarea>
       <button class="btn primary" id="ackerSend" style="height:40px;padding:0 16px">보내기</button>
@@ -1973,7 +1976,7 @@ const AK_VIEWS=[
   {v:'products',n:'상품구성 SKU',k:['sku','상품','재고','부자재','발주']},
   {v:'members',n:'직원 관리',k:['직원','계정','승인','비밀번호']}
 ];
-let AK={faq:[],conv:null,busy:false,greeted:false};
+let AK={faq:[],conv:null,busy:false,greeted:false,hist:[],deep:false};
 const akNorm=t=>String(t||'').toLowerCase().replace(/[\s\p{P}]/gu,'');
 function akEsc(t){return esc(t).replace(/\n/g,'<br>');}
 function akPush(role,html,actions,sources){
@@ -2101,6 +2104,7 @@ async function akAsk(q){
     }
     akPush('ai',akEsc(ans),f.actions||[],src);
     akSave('acker',ans,tier,f.actions,src?{src}:null);
+    AK.hist.push({role:'user',content:q});AK.hist.push({role:'assistant',content:ans});
     try{await sb.from('acker_faq').update({hits:(f.hits||0)+1}).eq('id',f.id);}catch(_){}
     AK.busy=false;return;
   }
@@ -2111,9 +2115,37 @@ async function akAsk(q){
     akSave('acker',t,'rule',[{label:v.n,view:v.v}]);
     AK.busy=false;return;
   }
-  const t='아직 제가 답할 수 있는 범위 밖입니다. 곧 콘솔 데이터를 직접 찾아 답하도록 넓히고 있습니다.\n지금은 아래처럼 물어봐 주세요 — 화면 위치와 업무 처리 방법은 바로 안내해 드립니다.';
-  akPush('ai',akEsc(t),[{label:'PPL 어디서 입력해요?',ask:'PPL 어디서 입력해요?'},{label:'구성 판매가 어떻게 넣어요?',ask:'구성 판매가 어떻게 넣어요?'}]);
-  akSave('acker',t,'rule');
+  // 사전답변·메뉴로 못 풀면 LLM에 넘긴다 (여기서만 비용 발생)
+  const wait=akPush('ai','찾아보는 중…');
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)throw new Error('no-session');
+    AK.hist.push({role:'user',content:q});
+    const r=await fetch('/api/acker',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
+      body:JSON.stringify({messages:AK.hist.slice(-8),view:(AK_VIEWS.find(v=>v.v===window.__actView)||{}).n||'',deep:AK.deep})});
+    const j=await r.json();
+    wait.remove();
+    if(j.error){
+      const m=j.error+(j.detail?('\n'+String(j.detail).slice(0,160)):'');
+      akPush('ai',akEsc('답변을 만들지 못했습니다 — '+m));
+      akSave('acker',m,'error');
+    }else{
+      const ans=j.text||'답변이 비어 있습니다.';
+      AK.hist.push({role:'assistant',content:ans});
+      const srcMap={my_tasks:'업무 지시',data_gaps:'편성·정산·구성 원장',broadcast:'방송 원장',
+        settle:'정산 원장',agency:'대행 정산서',decisions:'결정 기록'};
+      const src=[...new Set(j.tools||[])].map(t=>srcMap[t]||t).join(' · ')||null;
+      akPush('ai',akEsc(ans),[],src);
+      akSave('acker',ans,j.model&&j.model.includes('haiku')?'small':'large',null,src?{src,tools:j.tools}:null);
+      act('agent','llm',null,{tools:j.tools||[],in:j.in||0,out:j.out||0,model:j.model||null},'exec');
+    }
+  }catch(e){
+    wait.remove();
+    const t='지금은 화면 안내만 가능합니다. 아래처럼 물어봐 주세요.';
+    akPush('ai',akEsc(t),[{label:'PPL 어디서 입력해요?',ask:'PPL 어디서 입력해요?'},{label:'내 할 일이 뭐야?',ask:'내 할 일이 뭐야?'}]);
+    akSave('acker',t,'rule');
+  }
   AK.busy=false;
 }
 function akOpen(on){
@@ -2137,6 +2169,7 @@ $('ackerBtn')&&($('ackerBtn').onclick=()=>akOpen(!document.body.classList.contai
 $('ackerClose')&&($('ackerClose').onclick=()=>akOpen(false));
 $('ackerMax')&&($('ackerMax').onclick=()=>{const m=document.body.classList.toggle('acker-max');
   $('ackerMax').textContent=m?'⤡':'⤢';try{localStorage.setItem('hsAcker',m?'2':'1');}catch(_){}});
+$('ackerDeep')&&($('ackerDeep').onchange=()=>{AK.deep=$('ackerDeep').checked;});
 $('ackerSend')&&($('ackerSend').onclick=()=>akAsk($('ackerInput').value));
 $('ackerInput')&&$('ackerInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();akAsk($('ackerInput').value);}});

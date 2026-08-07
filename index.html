@@ -4927,7 +4927,10 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
   const costSrc=useReal?('품목원가 · '+(REAL_COST.code_src||'세트코드')):('원가율 '+Math.round(costR*100)+'%');
   const isFix=s.fee_type==='정액',feeBase=isFix?(+s.fee_amount||0):0,rate=+s.commission_rate||0;
   const teuk=Math.round(feeBase*vatFee);   // 정액비 (면세면 VAT포함)
-  const pplCost=Math.round((+s.ppl_cost||0)*vatFee);   // PPL비 (면세면 VAT포함)
+  // 대행 방송은 광고주(브랜드사) 건이다 — 매출도 PPL 비용도 우리 것이 아니다.
+  const isAg=(s.deal_type==='대행');
+  const pplRaw=Math.round((+s.ppl_cost||0)*vatFee);
+  const pplCost=isAg?0:pplRaw;   // PPL비 (면세면 VAT포함) · 대행 건은 우리 손익에서 제외
   const back=isFix?Math.round((convSale-pre)*backR):Math.round((convSale-pre)*rate);
   const backLabel=isFix?`추가수수료 (${Math.round(backR*100)}%)`:`정률수수료 (${Math.round(rate*100)}%)`;
   const backSub=`(전환매출 − 미리주문) × ${Math.round((isFix?backR:rate)*100)}%`;
@@ -4953,6 +4956,11 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
       <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#fff">${BCH[s.channel_id]||''}</div><div style="font-size:11px;color:rgba(255,255,255,.85);margin-top:2px">${s.product_name||''}</div></div>
     </div>
     <div style="padding:18px 22px">
+      ${isAg?`<div style="background:#FDF1DE;border:1px solid #F5D98B;border-radius:11px;padding:12px 15px;margin-bottom:14px;font-size:12px;color:#7A4A06;line-height:1.65">
+        <b>대행 방송입니다 — 아래 손익은 자사 기준 계산이라 이 방송에는 맞지 않습니다.</b><br>
+        이 방송의 매출은 광고주 매출이고, 우리 수익은 <b>대행 수수료</b>입니다. 「대행 결산」에서 확인해 주세요.
+        ${pplRaw>0?`<br>PPL ${won(pplRaw)}원은 <b>광고주 부담</b>이라 우리 손익에서 뺐습니다.`:''}
+      </div>`:''}
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px">${info.map(x=>chip(x[0],x[1])).join('')}</div>
       <div style="display:flex;gap:7px;margin-bottom:18px">${summ('주문목표',baekman(tg)+'백만')}${summ('판매매출',baekman(sale)+'백만')}${summ('달성률',achieve+'%',1)}${summ('전환매출',baekman(convSale)+'백만')}${summ('미리주문',baekman(pre)+'백만')}</div>
       <div style="font-size:12px;font-weight:800;color:#0D9488;margin:0 0 8px 2px">손익 산출 · ${taxed?'VAT 제외 공급가':'전환매출'} 기준</div>

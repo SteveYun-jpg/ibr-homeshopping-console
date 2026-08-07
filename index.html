@@ -1989,6 +1989,66 @@ async function akSave(role,content,tier,actions,sources){
     await sb.from('acker_message').insert({conversation_id:cid,role:role==='me'?'user':'acker',
       content,tier:tier||null,actions:actions||null,sources:sources||null});}catch(_){}
 }
+// 도구 호출 — 등급 판정은 DB 함수 안에서 강제된다(화면에서 가리는 게 아님)
+const AK_MON=()=>new Date().toISOString().slice(0,7);
+function akYm(q){const m=String(q).match(/(20\d{2})[.\-\/년\s]*(\d{1,2})\s*월?/);
+  if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0');
+  if(/이번\s*달|이달|당월/.test(q))return AK_MON();
+  if(/지난\s*달|전월/.test(q)){const d=new Date();d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);}
+  return null;}
+function akWon(n){return (Math.round(+n||0)).toLocaleString('ko-KR');}
+async function akTool(name,q){
+  const ym=akYm(q);
+  if(name==='ak_my_tasks'){
+    const {data,error}=await sb.rpc('ak_my_tasks');if(error)return '조회 실패 — '+dbMsg(error);
+    const rows=data||[];if(!rows.length)return '지금 열려 있는 업무 지시가 없습니다.';
+    const mine=rows.filter(r=>r.mine),over=rows.filter(r=>r.overdue);
+    let t=`업무 지시 ${rows.length}건입니다`+(mine.length?` (내 담당 ${mine.length}건)`:'')+(over.length?` · 기한 초과 ${over.length}건`:'')+'.\n';
+    rows.slice(0,8).forEach(r=>{t+=`\n· ${r.title}${r.due?` — 기한 ${r.due}`:''}${r.overdue?' ⚠기한초과':''} [${r.status==='open'?'지시':r.status==='doing'?'진행중':'보고완료'}]`;});
+    return t;
+  }
+  if(name==='ak_data_gaps'){
+    const {data,error}=await sb.rpc('ak_data_gaps');if(error)return '조회 실패 — '+dbMsg(error);
+    const g=data||{};const L=[];
+    if(g.ppl_no_cost>0)L.push(`· PPL 회당 비용 미입력 ${g.ppl_no_cost}개 — 손익에서 PPL 비용이 빠집니다`);
+    if(g.bc_no_result>0)L.push(`· 지난 방송인데 실적 미입력 ${g.bc_no_result}건`);
+    if(g.preset_lines_left>0)L.push(`· 구성 판매가 미설정 ${g.preset_lines_left}/${g.preset_lines_total} 라인 — 편성에 0원으로 들어갑니다`);
+    if(g.cost_unmatched>0)L.push(`· 구성↔세트코드 미매칭 ${g.cost_unmatched}건 — 원가가 원가율로 계산됩니다`);
+    if(g.sellout_missing>0)L.push(`· 소비자판매가 미입력 ${g.sellout_missing}행 — 영업기준이 정산액으로 잡힙니다`);
+    return L.length?('지금 비어 있는 것들입니다.\n\n'+L.join('\n')):'비어 있는 항목이 없습니다. 깔끔합니다.';
+  }
+  if(name==='ak_broadcast'){
+    const {data,error}=await sb.rpc('ak_broadcast',{p_ym:ym});if(error)return '조회 실패 — '+dbMsg(error);
+    const d=data||{};if(!d.count)return (ym||'전체')+' 방송이 없습니다.';
+    let t=`${ym||'전체'} 방송 ${d.count}건입니다.`;
+    if(d.target_sum)t+=` 목표 합계 ${akWon(d.target_sum)}원`;
+    if(d.sales_sum)t+=` · 실적 ${akWon(d.sales_sum)}원`;
+    if(d.no_result)t+=`\n실적 미입력이 ${d.no_result}건 있습니다.`;
+    (d.rows||[]).slice(0,6).forEach(r=>{t+=`\n· ${r.air} ${r.ch} ${r.product||r.brand||''}${r.has_result?'':' — 실적 미입력'}`;});
+    return t;
+  }
+  if(name==='ak_settle'){
+    const {data,error}=await sb.rpc('ak_settle',{p_ym:ym});if(error)return '조회 실패 — '+dbMsg(error);
+    const d=data||{},rows=d.rows||[];
+    if(!rows.length)return (ym||'전체')+' 결산 데이터가 없습니다.';
+    let t=`${d.ym} 자사 결산입니다.\n`;
+    rows.forEach(r=>{t+=`\n· ${r.ch} — 영업 ${akWon(r['영업'])} · 회계마감 ${akWon(r['회계마감'])}`
+      +(r['매출이익']!=null?` · 매출이익 ${akWon(r['매출이익'])}`:'');});
+    if(d.note)t+='\n\n'+d.note;
+    return t;
+  }
+  if(name==='ak_agency'){
+    const {data,error}=await sb.rpc('ak_agency',{p_ym:ym||AK_MON()});if(error)return '조회 실패 — '+dbMsg(error);
+    const rows=data&&data.rows||[];
+    if(!rows.length)return (ym||AK_MON())+' 대행 정산 데이터가 없습니다.';
+    const by={};rows.forEach(r=>{(by[r.agency]=by[r.agency]||{m:0,f:0,n:0});by[r.agency].m+=+r['매출']||0;by[r.agency].f+=+r['수수료']||0;by[r.agency].n++;});
+    let t=`${data.ym} 대행 결산입니다 (VAT별도 환산).\n`;
+    Object.entries(by).forEach(([k,v])=>{t+=`\n· ${k} — 매출 ${akWon(v.m)} · 수수료 ${akWon(v.f)} (홈사 ${v.n})`;});
+    t+='\n\n홈사별 수수료율은 「대행 결산 → 월별 청구」에서 대행사를 누르면 나옵니다.';
+    return t;
+  }
+  return null;
+}
 async function akAsk(q){
   q=(q||'').trim();if(!q||AK.busy)return;
   AK.busy=true;$('ackerInput').value='';
@@ -1997,8 +2057,18 @@ async function akAsk(q){
   try{await sb.rpc('acker_log_question',{p_q:q,p_module:'hs'});}catch(_){}
   const f=akMatchFaq(q);
   if(f){
-    akPush('ai',akEsc(f.answer),f.actions||[],null);
-    akSave('acker',f.answer,'rule',f.actions);
+    let ans=f.answer, tier='rule', src=null;
+    if(ans.startsWith('__TOOL__')){
+      const tool=ans.slice(8);
+      const wait=akPush('ai','찾아보는 중…');
+      const r=await akTool(tool,q);
+      wait.remove();
+      ans=r||'조회 결과가 없습니다.';
+      src=({ak_my_tasks:'업무 지시',ak_data_gaps:'편성·정산·구성 원장',ak_broadcast:'방송 원장',
+            ak_settle:'정산 원장',ak_agency:'대행 정산서'})[tool]||null;
+    }
+    akPush('ai',akEsc(ans),f.actions||[],src);
+    akSave('acker',ans,tier,f.actions,src?{src}:null);
     try{await sb.from('acker_faq').update({hits:(f.hits||0)+1}).eq('id',f.id);}catch(_){}
     AK.busy=false;return;
   }

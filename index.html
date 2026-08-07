@@ -1339,6 +1339,10 @@ function navTo(v,push){if(push===undefined)push=true;
   if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   document.body.classList.toggle('wf-full',v==='workflow');   // 워크플로우는 여백 없이 꽉 채움
+  {const now=Date.now();
+   if(window.__actView&&window.__actTs)act('view','stay',window.__actView,{ms:now-window.__actTs},'self');
+   act('view','open',v,null,'self');
+   window.__actView=v;window.__actTs=now;}
   if(typeof syncMobileTop==='function')syncMobileTop(v);
   if(typeof navDrawer==='function')navDrawer(false);
   if(window.innerWidth<760){document.body.classList.add('collapsed');window.scrollTo(0,0);}
@@ -1505,6 +1509,8 @@ function applyMemberGate(){
   const wn=$('wfNav');if(wn)wn.style.display=wfAllowed()?'':'none';
   if(!wfAllowed()){const wv=$('v-workflow');if(wv)wv.remove();}   // 직원 화면에는 흔적도 남기지 않는다
   if(AUTHED&&ok){questPing();
+    if(!window.__actLogged){window.__actLogged=true;
+      act('session','login',null,{grade:(ME&&ME.grade)||null,w:window.innerWidth},'self');actFlush();}
     try{const m=localStorage.getItem('hsAcker');
       if(m==='2'){document.body.classList.add('acker-max');akOpen(true);$('ackerMax').textContent='⤡';}
       else if(m==='1')akOpen(true);}catch(_){}
@@ -1928,6 +1934,28 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   // 회계마감기준 — 세금계산서 발행월(정산 원장) 기준
   await loadSettleMonthly();}
 
+// ===== 활동 기록 — 접속·화면·입력·업무·아커 질문 =====
+// 등급별 열람: self=본인+팀장+경영진 / lead=팀장+경영진 / exec=경영진만 (판정은 DB RLS)
+const ACT={q:[],sid:(function(){try{let v=sessionStorage.getItem('hsSid');
+  if(!v){v=Date.now().toString(36)+Math.random().toString(36).slice(2,8);sessionStorage.setItem('hsSid',v);}return v;}catch(_){return 'x';}})(),
+  last:Date.now(),timer:null};
+function act(kind,action,target,detail,visibility,target_id){
+  if(!ME||!ME.user_id)return;
+  ACT.q.push({kind,action,target:target||null,target_id:target_id||null,
+    detail:detail||null,visibility:visibility||'self',session_id:ACT.sid,
+    at:new Date().toISOString(),module:'hs'});
+  if(ACT.q.length>=15)actFlush();
+  else if(!ACT.timer)ACT.timer=setTimeout(actFlush,12000);
+}
+async function actFlush(){
+  if(ACT.timer){clearTimeout(ACT.timer);ACT.timer=null;}
+  if(!ACT.q.length||!ME||!ME.user_id)return;
+  const batch=ACT.q.splice(0,ACT.q.length);
+  try{await sb.rpc('core_log_activity',{p_events:batch});}catch(_){}
+}
+window.addEventListener('beforeunload',()=>{try{actFlush();}catch(_){}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)actFlush();});
+
 // ===== 아커 — 업무 도우미 =====
 // 1단계: 규칙 기반(사전답변 + 메뉴 안내). LLM 호출 없음 → 비용 0.
 const AK_VIEWS=[
@@ -2055,6 +2083,8 @@ async function akAsk(q){
   q=(q||'').trim();if(!q||AK.busy)return;
   AK.busy=true;$('ackerInput').value='';
   akPush('me',akEsc(q));akSave('me',q);
+  act('agent','ask',null,{q:q.slice(0,200)},'exec');
+  act('agent','ask_count',null,null,'self');
   await akLoadFaq();
   try{await sb.rpc('acker_log_question',{p_q:q,p_module:'hs'});}catch(_){}
   const f=akMatchFaq(q);
@@ -2201,6 +2231,7 @@ function questOpen(id){
     if(!t){$('qD_msg').innerHTML='<span style="color:var(--gold)">무엇을 했는지 한 줄 남겨주세요</span>';return;}
     const who=(ME&&ME.name)||'',stamp=`[${who} · ${new Date().toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}]`;
     const merged=(r.report_body?r.report_body+'\n\n':'')+stamp+'\n'+t;   // 여러 명이 이어서 쓴다
+    act('task','report','co_work_request',{title:r.title},'self',r.id);
     upd({status:'reported',report_body:merged,reported_at:new Date().toISOString(),reported_by:me},'완료 보고 전송 — 대표 확인 대기');});
   $('qD_join')&&($('qD_join').onclick=()=>{
     const co=[...new Set([...(r.collaborators||[]),me])];
@@ -2414,6 +2445,7 @@ $('suSave')&&($('suSave').onclick=async()=>{
       const {error}=await sb.from('hs_settle_raw').insert(payload.slice(i,i+200));
       if(error)throw error;
     }
+    act('write','upload','hs_settle_raw',{ch:BCH[ch]||null,ym,rows:payload.length,file:SU.file},'lead');
     toast(`${ym} ${BCH[ch]||''} 정산 ${payload.length}행 저장`,'ok');
     $('suMsg').innerHTML='<span style="color:#0f9d58">저장 완료 — 결산·검수에 반영됐습니다</span>';
     $('suPrev').innerHTML='';$('suFile').value='';$('suSetup').classList.add('hidden');SU.rows=[];
@@ -4530,6 +4562,7 @@ async function saveSchedule(silent){
     reason:'잠금 해제 후 수정',changes:{target_sales:row.target_sales,net_target:row.net_target,fee_type:feeType,
       fee_amount:row.fee_amount,commission_rate:row.commission_rate,air_at:airIso,conv_rate:row.conv_rate},
     actor_id:(ME&&ME.user_id)||null,actor_name:(ME&&ME.name)||$('who').textContent});}catch(_){}}
+  if(!err)act('write','save','hs_schedules',{product:row.product_name,ch:BCH[row.channel_id]||null,new:wasNew},'lead',BC.id);
   if(!silent)toast(err?'저장 실패':(wasNew?(dealType==='대행'?'방송 생성됨':'방송정보 저장 (작성중) · 구성까지 저장해야 확정됩니다'):'방송 정보 저장됨'),err?'err':'ok');
   updateSaveGate();
   return !err;}
@@ -4547,6 +4580,7 @@ $('saveBc').onclick=async()=>{const ok=await saveSchedule(true);if(!ok)return;
      const {data:ex}=await sb.from('hs_results').select('id').eq('schedule_id',BC.id).maybeSingle();
      if(ex)await sb.from('hs_results').update(resRow).eq('schedule_id',BC.id);else await sb.from('hs_results').insert(resRow);}}
   COMP_SAVED=(COMPS.length>0);applyLock();applyDraftGate();
+  act('write','save','hs_results',{comps:COMPS.length,ticks:TICKS.length},'lead',BC.id);
   toast('방송 저장 완료 · 방송직후 실적 반영','ok');};
 $('genReport').onclick=()=>{const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null,total=T.preAmt+T.onAmt,tg=+s.target_sales||0,conv=s.conv_rate||0,tax=s.tax_type==='과세'?'VAT포함':'면세';
   let r=`[${BCH[s.channel_id]||''} ${s.product_name||''}]\n`;if(s.program_name)r+=`${s.program_name}\n`;

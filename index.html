@@ -663,7 +663,7 @@ body.acker-max main{padding-right:30px}
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 홈쇼핑사 <span class="muted" id="fChTag" style="font-weight:400"></span></label><select id="fChannel"></select></div><div><label>브랜드 <span class="muted" id="fBrandHint" style="font-weight:400"></span></label><select id="fBrand"></select></div><div><label>라인 <span class="muted" id="fLineHint" style="font-weight:400"></span></label><select id="fLineTop"><option value="">라인 선택</option></select></div></div>
             <div class="row3"><div style="grid-column:1 / -1"><label><span style="color:#DC2626" title="저장 필수">●</span> 방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
             <div class="row3"><div><label>정산 구분</label><div class="seg" id="fFeeSeg"><button type="button" data-v="정액" class="on">정액</button><button type="button" data-v="정률">정률</button></div></div><div><div id="fFixedBox"><label>특약비(원)</label><input type="text" inputmode="numeric" id="fFixed"></div><div id="fRateBox" style="display:none"><label id="fRateLbl">홈사 수수료율(%)</label><input type="number" id="fRate"></div></div><div><label>거래 구분</label><div class="seg" id="fDealSeg"><button type="button" data-v="자사" class="on">자사</button><button type="button" data-v="대행">대행</button></div><span class="hint" id="dealHint" style="display:none;font-size:10.5px">대행: 수익 = 매출 × 대행수수료율</span></div></div>
-            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 방송 시작 <span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
+            <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 방송 시작 <input type="date" id="fDate" class="hsearch" style="width:140px;font-weight:400;padding:2px 6px;font-size:12px;margin-left:4px" title="방송 날짜. 편성이 옮겨지면 여기만 바꾸고 저장하면 됩니다 — 다시 만들지 않아도 됩니다."><span class="muted" id="fDateLbl" style="font-weight:400"></span></label><input type="time" id="fAir" step="60"></div><div><label>방송 종료</label><input type="time" id="fEnd" step="60"></div><div></div></div>
             <div class="row3"><div><label>주문매출목표</label><input type="text" inputmode="numeric" id="fTarget"></div>
               <div><label>순매출목표 <span class="muted" style="font-weight:400;font-size:10.5px">주문매출 × 전환율 · 자동</span></label>
                 <input type="text" inputmode="numeric" id="fNet" readonly title="주문매출목표와 전환율로 자동 계산됩니다" style="background:var(--bg1);color:var(--ink2)"></div>
@@ -1604,8 +1604,14 @@ function showColMenu(id,ci,anchor){
 function viewHash(v,id){return '#'+v+(id?('/'+id):'');}
 function pushView(v,id){try{const st=history.state;if(st&&st.v===v&&st.id===id)return;
   history.pushState({v,id:id||null},'',viewHash(v,id));}catch(_){}}
-function parseHash(){const h=(location.hash||'').replace(/^#/,'');if(!h)return null;
-  const [v,id]=h.split('/');return v?{v,id:id||null}:null;}
+function parseHash(){const h=(location.hash||'').replace(/^#/,'');
+  if(h){const [v,id]=h.split('/');if(v)return{v,id:id||null};}
+  /* 짧은 주소 «/c/<방송ID>» — 단톡에 붙이는 콜현황 링크.
+     발행부(⚙︎ 콜현황 버튼)만 있고 «수신부»가 없어서 그동안 전부 404 였다.
+     _redirects 가 /c/* 를 index.html 로 넘겨 주면 여기서 받는다. (2026-08-26) */
+  const m=(location.pathname||'').match(/^\/c\/([0-9a-fA-F-]{36})\/?$/);
+  if(m)return{v:'calllive',id:m[1],__short:true};
+  return null;}
 function navTo(v,push){if(push===undefined)push=true;
   if(typeof clExit==='function')clExit();
   if(typeof arExit==='function')arExit();
@@ -1872,8 +1878,19 @@ async function presetProgress(){
 function questNotice(list,boss,over){
   const mask=$('qNoticeMask');if(!mask||!list||!list.length)return;
   const today=new Date().toISOString().slice(0,10);
-  const sig=today+'|'+list.map(r=>r.id).sort().join(',');
-  try{ if(!over && localStorage.getItem('hsQNotice')===sig) return; }catch(_){}
+  const ids=list.map(r=>r.id).sort();
+  /* 「오늘 하루 안 보기」가 안 먹던 것 (김진호 이사 2026-08-25).
+     전에는 «오늘 + 목록 전체»를 열쇠로 삼았다. 그런데 이 목록은 하루에도 몇 번씩 바뀐다 —
+     담당이 완료 보고를 하나 올리거나, 확인을 하나 눌러도 열쇠가 달라져서 다시 떴다.
+     확인 대기가 많은 사람일수록 「안 보기」가 사실상 안 먹었다.
+
+     이제 «그날 접어 둔 건 목록»을 기억하고, «접어 둔 적 없는 건»이 새로 생겼을 때만 다시 띄운다.
+     확인해서 목록이 줄어드는 것으로는 다시 뜨지 않는다. 기한 초과(over)는 지금처럼 항상 뜬다. */
+  let muted=[];
+  try{ const raw=localStorage.getItem('hsQNotice');
+       if(raw){ const o=JSON.parse(raw); if(o&&o.d===today&&Array.isArray(o.ids))muted=o.ids; } }catch(_){}
+  const 새로운게있나=ids.some(id=>muted.indexOf(id)<0);
+  if(!over && muted.length && !새로운게있나) return;
   const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
   $('qNoticeTitle').textContent=boss?'확인 대기 중인 완료 보고':'나에게 온 업무 지시';
   $('qNoticeSub').textContent=boss?`${list.length}건이 확인을 기다리고 있습니다`
@@ -1897,7 +1914,10 @@ function questNotice(list,boss,over){
      체크박스를 켜면 그 자리에서 닫는다. 「안 보기」를 눌렀는데 안 없어지면 눌린 줄 모른다. */
   /* 이름을 onEsc 로 둔다 — esc 는 이 파일 전역의 HTML 이스케이프 함수다.
      여기서 const esc 로 가리면 같은 함수 안 위쪽의 esc(...) 호출이 전부 죽는다. */
-  const close=()=>{ if($('qNoticeMute').checked){try{localStorage.setItem('hsQNotice',sig);}catch(_){}}
+  const close=()=>{ if($('qNoticeMute').checked){
+      // 접어 둔 건을 «합쳐» 기억한다 — 오늘 이미 접어 둔 것 + 지금 보고 있는 것
+      try{ const all=Array.from(new Set(muted.concat(ids)));
+           localStorage.setItem('hsQNotice',JSON.stringify({d:today,ids:all})); }catch(_){}}
     mask.style.display='none'; document.removeEventListener('keydown',onEsc); };
   const onEsc=e=>{ if(e.key==='Escape')close(); };
   $('qNoticeMute').checked=false;
@@ -5348,7 +5368,14 @@ $('fBrand')&&$('fBrand').addEventListener('change',()=>{const b=BRAND_DEAL[$('fB
   if(PICKERS){fillLineTop(false);applyAutoName();autoRound();}});
 document.querySelectorAll('#fDealSeg button').forEach(b=>b.onclick=()=>setDealSeg(b.dataset.v));
 // 방송 날짜는 달력에서 고정, 시:분(time input)만 입력 → 전체 시각 조합
-function bcTimes(){const base=(BC&&BC.air_at)?new Date(BC.air_at):new Date();const y=base.getFullYear(),mo=base.getMonth(),d=base.getDate();
+function bcTimes(){let base=(BC&&BC.air_at)?new Date(BC.air_at):new Date();
+  /* 편성 날짜를 화면에서 바꿀 수 있게 한다 (이예슬 주임 개발요청 2026-08-24).
+     전에는 캘린더에서 누른 «칸»의 날짜가 고정이라, 25일→24일로 옮기려면
+     24일에 처음부터 새로 만들고 25일 것을 지워야 했다. 이제 이 칸만 고치면 된다. */
+  {const dv=($('fDate')&&$('fDate').value)||'';
+   if(/^\d{4}-\d{2}-\d{2}$/.test(dv)){const[Y,M,D]=dv.split('-').map(Number);
+     base=new Date(Y,M-1,D,base.getHours(),base.getMinutes(),0);}}
+  const y=base.getFullYear(),mo=base.getMonth(),d=base.getDate();
   const at=$('fAir').value,et=$('fEnd').value;if(!at)return{startIso:null,endIso:null};
   const[ah,am]=at.split(':').map(Number);const start=new Date(y,mo,d,ah||0,am||0,0);
   let end=null;if(et){const[eh,em]=et.split(':').map(Number);end=new Date(y,mo,d,eh||0,em||0,0);if(end<=start)end=new Date(end.getTime()+864e5);}
@@ -5958,7 +5985,10 @@ async function showBcForm(push){const s=BC;
     $('fLineTop').value=ln;fillSkuPicker();updateCompBL();
     LAST_AUTONAME=bcAutoName();}   // 저장된 이름이 자동패턴이면 라인 변경 시 갱신, 커스텀이면 보존
   $('fAir').value=s.air_at?hhmm(new Date(s.air_at)):'';$('fEnd').value=s.air_end?hhmm(new Date(s.air_end)):'';
-  {const dd=new Date(s.air_at);$('fDateLbl').textContent=`(${dd.getFullYear()}.${dd.getMonth()+1}.${dd.getDate()} ${DOW[dd.getDay()]})`;}
+  {const dd=new Date(s.air_at);
+   const pad=n=>String(n).padStart(2,'0');
+   if($('fDate'))$('fDate').value=`${dd.getFullYear()}-${pad(dd.getMonth()+1)}-${pad(dd.getDate())}`;
+   $('fDateLbl').textContent=`(${DOW[dd.getDay()]})`;}
   $('fAgency').value=s.agency_fee_rate?Math.round(s.agency_fee_rate*1000)/10:'';   // setDealSeg보다 먼저 채워야 기준값이 덮어쓰지 않음
   setFeeSeg(s.fee_type||'정액');setDealSeg(s.deal_type||'자사');$('fFixed').value=withComma(s.fee_amount);$('fRate').value=s.commission_rate?Math.round(s.commission_rate*100):'';
   $('fTarget').value=withComma(s.target_sales);$('fNet').value=withComma(s.net_target);$('fConv').value=s.conv_rate?Math.round(s.conv_rate*100):'';$('fTax').value=s.tax_type||'면세';$('fProg').value=s.program_name||'';
@@ -6005,7 +6035,7 @@ async function saveComps(){if(!BC||BC.__new){toast('먼저 방송 정보를 저�
 function applyLock(){const lock=BC_LOCKED;
   // 방송 종료 후에도 '실적 입력'은 계속 가능해야 함(팀의 주 업무).
   // 잠그는 건 편성 조건(홈사·시간·목표·수수료)뿐이고, 구성·틱은 열어둔다.
-  ['fChannel','fBrand','fLineTop','fSku','fProduct','fAir','fEnd','fFixed','fRate','fTarget','fNet','fConv','fTax','fPpl','fPplCost','fPplYn','fCost','fBack'].forEach(id=>{const el=$(id);if(el)el.disabled=lock;});
+  ['fChannel','fBrand','fLineTop','fSku','fProduct','fDate','fAir','fEnd','fFixed','fRate','fTarget','fNet','fConv','fTax','fPpl','fPplCost','fPplYn','fCost','fBack'].forEach(id=>{const el=$(id);if(el)el.disabled=lock;});
   document.querySelectorAll('#fFeeSeg button,#fDealSeg button').forEach(b=>{b.disabled=lock;b.style.opacity=lock?.45:1;b.style.cursor=lock?'not-allowed':'pointer';});
   $('genTick').disabled=false;$('tickStep').disabled=false;$('clrTick').disabled=false;
   {const ss=$('saveSchedule');if(ss)ss.style.display='';}
@@ -6911,7 +6941,34 @@ $('noticeListBtn')&&($('noticeListBtn').onclick=async()=>{
 
 // ===== 모바일: 서랍 메뉴 · 상단바 =====
 const isMobile=()=>window.matchMedia('(max-width:760px)').matches;
-function navDrawer(open){document.body.classList.toggle('navopen',open===undefined?!document.body.classList.contains('navopen'):!!open);}
+/* 모바일 서랍 (신현아 주임 2026-08-25 「왼쪽 항목탭이 아예 안 보입니다」)
+
+   셸 이관 뒤로 우리 ☰ 가 죽어 있었다. hs-takeover 가 «#sidebar{display:none !important}» 로
+   원래 사이드바를 숨기는데, 우리 navDrawer 는 그 숨겨진 사이드바를 열려고 했다.
+   !important 라 body.navopen 으로는 못 이긴다 — 눌러도 아무 일이 없었다.
+   셸은 자기 서랍을 «sh-mobileopen» 클래스로 연다. 이관됐으면 그쪽을 연다. */
+function shellTookOver(){return !!document.getElementById('sidebarSlot');}
+function navDrawer(open){
+  const on = open===undefined ? !document.body.classList.contains('navopen') : !!open;
+  document.body.classList.toggle('navopen', on);
+  if(!shellTookOver())return;
+  document.body.classList.toggle('sh-mobileopen', on);
+  // takeover 판은 상태 클래스가 body 가 아니라 .sh-scope 루트에 붙는다
+  document.querySelectorAll('.sh-scope').forEach(el=>{
+    if(!el.classList.contains('sh-passthru'))el.classList.toggle('sh-mobileopen', on);});
+}
+/* 셸이 자기 상단바(.sh-mtop)를 만들면 우리 것과 «둘»이 된다 — 52px 짜리가 겹쳐 보인다.
+   셸 것이 실제로 떴을 때만 우리 것을 접는다. 안 떴으면 우리 것이 유일한 길이라 그대로 둔다. */
+(function hideDupMobileTop(){
+  let n=0;
+  const t=setInterval(()=>{
+    if(++n>40)return clearInterval(t);                    // 20초까지만 본다
+    if(!document.querySelector('.sh-mtop'))return;
+    const m=document.getElementById('mtop');
+    if(m)m.style.display='none';
+    clearInterval(t);
+  },500);
+})();
 $('mtopBtn')&&($('mtopBtn').onclick=e=>{e.stopPropagation();navDrawer();});
 $('mtopWho')&&($('mtopWho').onclick=e=>{e.stopPropagation();navDrawer(true);const t=$('userTrigger');if(t)setTimeout(()=>t.click(),250);});
 // 딤(::after)·본문 아무 곳이나 누르면 닫힘 · 메뉴 고르면 닫힘
@@ -7543,7 +7600,8 @@ function syncMobileTop(v){
 // boot
 refreshAuth().then(async()=>{
   const h=parseHash();                                   // 새로고침 시 보던 화면 복원
-  try{history.replaceState(h||{v:'home'},'',h?viewHash(h.v,h.id):location.pathname);}catch(_){}
+  try{history.replaceState(h||{v:'home'},'',
+        h?((h.__short?'/':'')+viewHash(h.v,h.id)):location.pathname);}catch(_){}
   if(AUTHED){await initMaterial();if(h)routeTo(h);else loadHome();
     if(PW_RECOVERY)setTimeout(()=>openPwModal(true),400); else checkNotice();}
   else if(window._hsAuto&&$('liPw').value){signIn();}

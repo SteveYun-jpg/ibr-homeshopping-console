@@ -16,10 +16,17 @@ export default async (req: Request, _context: Context) => {
   const target = id ? `${APP}/#calllive/${id}` : APP;
   if (id) {
     try {
-      const r = await fetch(
-        `${SB}/rest/v1/hs_v_call_meta?id=eq.${id}&select=channel_name,product_name,air_at`,
-        { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } },
-      );
+      // 뷰를 anon 에 열면 필터 없이 전 편성표가 새어 나간다.
+      // id 를 아는 사람만 그 한 줄을 받는 rpc 로 바꿨다. (2026-08-26)
+      const r = await fetch(`${SB}/rest/v1/rpc/hs_call_meta_og`, {
+        method: "POST",
+        headers: {
+          apikey: ANON,
+          Authorization: `Bearer ${ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_id: id }),
+      });
       const rows = await r.json();
       const b = rows && rows[0];
       if (b) {

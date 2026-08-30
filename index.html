@@ -1850,7 +1850,13 @@ async function questPing(){
   if(boss&&wait){$('qBannerTxt').innerHTML=`팀원이 완료 보고한 업무 <b>${wait}건</b>이 확인을 기다리고 있습니다.`;bn.style.display='flex';}
   else if(!boss&&mine.length){$('qBannerTxt').innerHTML=`나에게 지시된 업무 <b>${mine.length}건</b>이 있습니다.${over?` (기한 초과 <b style="color:#B91C1C">${over}건</b>)`:''} 끝내면 완료 보고를 눌러주세요.`;bn.style.display='flex';}
   else bn.style.display='none';
-  questNotice(boss?rows.filter(r=>r.status==='reported'):mine, boss, over);
+  /* 「오늘 안 보기」는 서버(hs_quest_mute)에 담는다 — 브라우저마다 따로 기억하던 것을 고쳤다.
+     읽기가 실패해도 팝업은 떠야 한다(안 뜨는 것보다 두 번 뜨는 게 낫다). */
+  let qMute=null;
+  try{ const {data:qm}=await sb.from('hs_quest_mute').select('mute_date,ids')
+        .eq('user_id',(ME&&ME.user_id)||'00000000-0000-0000-0000-000000000000').maybeSingle();
+       qMute=qm||null; }catch(_){}
+  questNotice(boss?rows.filter(r=>r.status==='reported'):mine, boss, over, qMute);
 }
 // 구성 판매가 입력 진행률 — 지시가 끝날 때까지 접속할 때마다 남은 항목을 보여준다
 async function presetProgress(){
@@ -1875,7 +1881,7 @@ async function presetProgress(){
   box.appendChild(el);
 }
 // 접속하면 공지처럼 먼저 띄운다 (기한 초과가 있으면 '오늘 안 보기'와 무관하게 항상)
-function questNotice(list,boss,over){
+function questNotice(list,boss,over,qMute){
   const mask=$('qNoticeMask');if(!mask||!list||!list.length)return;
   const today=new Date().toISOString().slice(0,10);
   const ids=list.map(r=>r.id).sort();
@@ -1887,8 +1893,11 @@ function questNotice(list,boss,over){
      이제 «그날 접어 둔 건 목록»을 기억하고, «접어 둔 적 없는 건»이 새로 생겼을 때만 다시 띄운다.
      확인해서 목록이 줄어드는 것으로는 다시 뜨지 않는다. 기한 초과(over)는 지금처럼 항상 뜬다. */
   let muted=[];
-  try{ const raw=localStorage.getItem('hsQNotice');
-       if(raw){ const o=JSON.parse(raw); if(o&&o.d===today&&Array.isArray(o.ids))muted=o.ids; } }catch(_){}
+  if(qMute && qMute.mute_date===today && Array.isArray(qMute.ids)) muted=qMute.ids;
+  else { // 서버를 못 읽었을 때만 브라우저 기억을 본다
+    try{ const raw=localStorage.getItem('hsQNotice');
+         if(raw){ const o=JSON.parse(raw); if(o&&o.d===today&&Array.isArray(o.ids))muted=o.ids; } }catch(_){}
+  }
   const 새로운게있나=ids.some(id=>muted.indexOf(id)<0);
   if(!over && muted.length && !새로운게있나) return;
   const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
@@ -1916,8 +1925,12 @@ function questNotice(list,boss,over){
      여기서 const esc 로 가리면 같은 함수 안 위쪽의 esc(...) 호출이 전부 죽는다. */
   const close=()=>{ if($('qNoticeMute').checked){
       // 접어 둔 건을 «합쳐» 기억한다 — 오늘 이미 접어 둔 것 + 지금 보고 있는 것
-      try{ const all=Array.from(new Set(muted.concat(ids)));
-           localStorage.setItem('hsQNotice',JSON.stringify({d:today,ids:all})); }catch(_){}}
+      const all=Array.from(new Set(muted.concat(ids)));
+      try{ localStorage.setItem('hsQNotice',JSON.stringify({d:today,ids:all})); }catch(_){}
+      // 서버에도 남긴다 — 다른 기기·다른 브라우저에서도 안 뜨게
+      if(ME&&ME.user_id){ sb.from('hs_quest_mute').upsert(
+          {user_id:ME.user_id,mute_date:today,ids:all,updated_at:new Date().toISOString()},
+          {onConflict:'user_id'}).then(({error})=>{ if(error)console.warn('[quest] 안보기 저장 실패',error.message); }); }}
     mask.style.display='none'; document.removeEventListener('keydown',onEsc); };
   const onEsc=e=>{ if(e.key==='Escape')close(); };
   $('qNoticeMute').checked=false;

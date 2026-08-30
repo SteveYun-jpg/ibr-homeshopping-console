@@ -1,0 +1,81 @@
+name: sync repo from live
+
+# 라이브에 올라간 판을 레포가 «스스로» 따라오게 한다.
+#
+# 왜 필요한가
+#   세션은 Netlify 로 배포는 할 수 있는데 GitHub 에 push 할 수단이 없다.
+#   그래서 배포할 때마다 레포가 뒤처졌고, 누가 push 하면 라이브가 옛판으로 되돌아갔다.
+#   (2026-08-24 에 16일·15만 자 차이까지 벌어진 적이 있다)
+#
+# 어떻게 막나
+#   이 작업이 30분마다 라이브 index.html 을 받아 레포와 다르면 커밋한다.
+#   GITHUB_TOKEN 은 Actions 가 자동으로 주므로 «따로 넣을 비밀이 없다».
+#
+# 커밋 메시지에 [skip ci] 를 붙인다
+#   안 붙이면 이 커밋이 Netlify 재빌드를 걸고, 그 빌드가 다시 라이브를 바꾸고,
+#   그걸 또 따라오는 되돌이가 된다. 붙이면 레포만 조용히 맞춰진다.
+#
+# ── 2026-08-29 정정 ────────────────────────────────────────────────
+#   처음 판은 shared/workflow.css·js 도 같이 받아 왔다. 그런데 그 둘은
+#   ibr-workflow-module 로 이사했고 여기는 301 로 넘긴다.
+#   curl -fsS 는 «301 에도 종료코드 0» 을 준다. 그래서 실측해 보니
+#       받은 크기 74바이트 · 내용 "Redirecting to https://ibr-workflow-module…"
+#   이 스텁을 workflow.css 라며 커밋할 뻔했다.
+#   자동 복구기는 «비어 있지 않은가»로만 보므로 74바이트도 통과시킨다 — 그대로 배포됐을 것이다.
+#
+#   그래서 shared/* 는 «받지 않는다». 그 파일들의 주인은 이제 워크플로우 모듈이다.
+#   레포의 사본은 자동 복구기가 요구하는 목록이라 «남겨 두되 건드리지 않는다».
+#
+#   교훈 — 응답코드로 판단하지 않는다. 받은 «내용»을 본다. 아래 확인 단계가 그것이다.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 라이브 index.html 받기
+        run: |
+          set -e
+          B=https://ibr-homeshopping-console.netlify.app
+          curl -fsS "$B/index.html" -o index.html.new
+
+          # 받은 것이 «정말 콘솔인가» 를 내용으로 확인한다.
+          # 404 페이지·리다이렉트 스텁·잘린 파일을 커밋하지 않기 위해서다.
+          grep -q "IBR COMMERCE" index.html.new
+          test "$(wc -c < index.html.new)" -gt 300000
+
+          mv index.html.new index.html
+
+      - name: shared/* 가 아직 새 집을 가리키는지 확인 (받지는 않는다)
+        run: |
+          B=https://ibr-homeshopping-console.netlify.app
+          for f in workflow.css workflow.js; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$B/shared/$f")
+            body=$(curl -sL "$B/shared/$f" | wc -c)
+            echo "shared/$f : $code · 따라가면 ${body}바이트"
+            # 301 이 사라졌다면 누군가 _redirects 를 되돌린 것이다. 실패시켜 알린다.
+            [ "$code" = 301 ] || { echo "::error::shared/$f 의 301 이 사라졌습니다"; exit 1; }
+            [ "$body" -gt 3000 ] || { echo "::error::새 집에서 shared/$f 가 안 옵니다"; exit 1; }
+          done
+
+      - name: 다르면 커밋
+        run: |
+          git config user.name  "sync-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet -- index.html; then
+            echo "레포 = 라이브 · 할 일 없음"
+          else
+            git add index.html
+            git commit -m "라이브 판으로 동기화 [skip ci]"
+            git push
+            echo "레포를 라이브에 맞췄습니다"
+          fi

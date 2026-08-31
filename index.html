@@ -3329,7 +3329,15 @@ function suExtractPreset(){
     const kk=keyIx.map(i=>i>=0?String(row[i]==null?'':row[i]).trim():'').join('');
     let rec=g.get(kk);
     if(!rec){
-      rec={product_name:nm,deal_form:p.deal||null};
+      /* 거래유형 — 프리셋의 deal 을 그대로 쓰되, 파일명이 «반대»를 말하면 비워 둔다.
+         2026-07 NS 직매입 파일이 위수탁 프리셋에 걸려 8행이 위수탁으로 적재된 적이 있다.
+         무엇이 맞는지는 원본을 본 사람만 안다. 그래서 «고르지 않고 비운다» —
+         비면 아래 저장 전 검사가 빨간 경고로 잡아 사람에게 묻는다. (2026-08-31) */
+      rec={product_name:nm,deal_form:(function(){
+        const d=p.deal||null, fn=SU.file||'';
+        const fd=/직매입/.test(fn)?'직매입':(/위수탁|특약/.test(fn)?'위수탁':null);
+        return (d&&fd&&d!==fd)?null:(d||fd);
+      })()};
       for(const k in ix.txt){if(k==='product_name')continue;const i=ix.txt[k];
         if(i>=0&&row[i]!=null&&row[i]!==''){let v=String(row[i]).trim();
           if(k==='tax_type')v=/면/.test(v)?'면세':(/과/.test(v)?'과세':null);
@@ -3734,6 +3742,22 @@ async function suPreflight(ch,ym,forms,rows,file,corp){
     warns.push(`<b>부가세 신고금액이 전부 0입니다.</b> 「세액」처럼 세금 자체를 적은 칸을 잡았을 수 있습니다 — 면세 상품이면 그 칸은 0입니다. 회계 결산이 이 칸을 계산서 기준으로 읽으니 <b>이대로 저장하면 그 달 매출이 0으로 잡힙니다.</b> 「컬럼 연결」에서 신고금액 칸을 다시 지정하거나, 자료에 그 칸이 없으면 비워 두세요(매출총액으로 대신 잡힙니다).`);
   if(sg>0 && ss===0 && rows.some(r=>r.sellout_amount==null))
     warns.push(`영업기준(소비자판매가)이 비어 있습니다. 자료에 그 칸이 없으면 정상이지만, 있는데 연결이 안 된 것이라면 「컬럼 연결」에서 지정해 주세요.`);
+  /* 파일명이 말하는 거래유형과 실제로 잡힌 거래유형이 어긋나는 경우.
+     2026-07 「NS홈쇼핑 직매입 …xlsx」 8행이 «위수탁»으로 들어가, 직매입에 없어야 할
+     수수료 1,607,340원이 붙고 원가가 비었다. 회계는 그걸 합산해 NS 수수료율을 63.4%로 읽었다.
+     숫자만 보면 멀쩡해 보여서 아무도 못 봤다. 그래서 «파일 이름»으로 대조한다. */
+  const fnDeal=/직매입/.test(file||'')?'직매입':(/위수탁|특약/.test(file||'')?'위수탁':null);
+  const gotDeals=[...new Set(rows.map(r=>r.deal_form).filter(Boolean))];
+  if(fnDeal&&gotDeals.length&&!gotDeals.includes(fnDeal))
+    warns.push(`<b>파일 이름은 「${fnDeal}」인데 「${gotDeals.join('·')}」으로 읽었습니다.</b> 양식(프리셋)이 잘못 잡혔을 수 있습니다 — 「직접 연결할게요」로 바꾸거나, 파일이 맞는지 확인해 주세요. <b>직매입에 수수료가 붙으면 회계 수수료율이 통째로 틀어집니다.</b>`);
+  if(fnDeal&&!gotDeals.length)
+    warns.push(`<b>거래유형이 비어 있습니다.</b> 파일 이름은 「${fnDeal}」로 보입니다 — 「컬럼 연결」에서 거래유형을 지정하거나 양식을 다시 골라 주세요.`);
+  const dirFee=rows.filter(r=>r.deal_form==='직매입'&&r.commission_amt);
+  if(dirFee.length)
+    warns.push(`<b>직매입 ${dirFee.length}행에 수수료가 붙어 있습니다.</b> 직매입은 우리가 물건을 넘기고 공급가를 받는 구조라 홈사 수수료가 없습니다 — 위수탁 양식으로 읽었을 수 있습니다.`);
+  const comCost=rows.filter(r=>r.deal_form==='위수탁'&&r.unit_cost);
+  if(comCost.length)
+    warns.push(`위수탁 ${comCost.length}행에 매입원가가 들어 있습니다. 직매입 자료가 섞이지 않았는지 확인해 주세요.`);
   if(cur.n&&Math.abs(cur.q-neu.q)<1 && Math.abs(cur.g-neu.g)>Math.max(cur.g,neu.g)*0.05)
     warns.push(`수량은 같은데 <b>금액만 다릅니다</b> (${won(cur.g)} → ${won(neu.g)}). 같은 거래를 <b>다른 금액 기준</b>으로 읽고 있을 수 있습니다 — 정산금액인지 소비자판매가인지 확인해 주세요.`);
   return {cur,neu,warns,chk};

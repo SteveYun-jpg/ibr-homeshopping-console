@@ -2460,6 +2460,36 @@ function mrMode(key,mode){const st=MR[key];if(!st||st.mode===mode)return;
   st.host.querySelector('.mr-quick').style.display=(mode==='single')?'none':'';
   mrPaint(key);}
 // 행 하나가 기간 안에 드는지 (ym 문자열 또는 날짜 앞 7자리)
+/* 기간 조회를 «한국 시각 기준»으로 자른다. 2026-09-02.
+
+   두 가지가 겹쳐 있었다.
+
+   ① 없는 날짜를 만들고 있었다
+      `to+'-31'` → 2·4·6·9·11월을 끝으로 고르면 '2026-09-31' 이 되고,
+      PostgREST 가 400(date/time field value out of range)으로 «조회 자체를 거부»한다.
+      그래프가 통째로 빈 채로 남는다. 「데이터가 없나 보다」로 보인다.
+
+   ② «UTC 로» 자르고 있었다  ← 이게 더 근본이다
+      air_at 은 timestamptz 다. 'YYYY-MM-DD' 문자열로 비교하면 UTC 자정 기준으로 잘린다.
+      한국은 UTC+9 이라 「8월」이 실제로는 «KST 8/1 09:00 ~ 9/1 09:00» 이 된다.
+      새벽 방송이 옆 달로 넘어간다. 실측 2건 —
+        KST 2026-06-01 07:45 방송이 UTC 로는 5월  → 6월 결산에서 빠짐
+        KST 2026-08-01 05:15 방송이 UTC 로는 7월  → 8월 결산에서 빠짐
+      홈쇼핑은 새벽 방송이 많아 계속 생긴다.
+
+      그리고 뷰(hs_v_settle_flash)는 이미 `air_at AT TIME ZONE 'Asia/Seoul'` 로 날짜를 만든다.
+      «표는 KST, 그래프 조회는 UTC» 였다. 또 같은 판단이 두 벌이었다.
+
+   그래서 KST 자정을 그대로 시각으로 만들어 던진다. 끝은 «다음 달 1일 미만».
+   달의 마지막 날을 세는 방식은 쓰지 않는다 — 세어 맞춰도 그 날 «낮·밤» 방송이 빠지기 때문이다
+   (lte '2026-08-31' 은 8/31 00:00 까지만 잡는다). */
+const ymNext=(ym)=>{const [y,m]=String(ym||'').split('-').map(Number);
+  if(!y||!m)return null;
+  return m>=12?((y+1)+'-01'):(y+'-'+String(m+1).padStart(2,'0'));};
+// 「YYYY-MM」 → 그 달 1일 00:00 «한국시각» 을 UTC ISO 로
+const kstYmStart=(ym)=>{const t=String(ym||'').match(/^(\d{4})-(\d{2})$/);
+  if(!t)return null;
+  return new Date(`${ym}-01T00:00:00+09:00`).toISOString();};
 const mrHit=(r,v)=>{const k=(r||'').slice(0,7);if(!k)return false;
   if(v.from&&k<v.from)return false;if(v.to&&k>v.to)return false;return true;};
 
@@ -2500,7 +2530,7 @@ async function stCharts(){
   const from=v.from||(y+'-01'), to=v.to||(y+'-12');
   const {data}=await sb.from('hs_v_settle_flash')
     .select('air_at,channel_name,brand_name,판매매출,잠정손익')
-    .eq('deal_type','자사').gte('air_at',from+'-01').lte('air_at',to+'-31');
+    .eq('deal_type','자사').gte('air_at',kstYmStart(from)||'1900-01-01').lt('air_at',kstYmStart(ymNext(to))||'2999-01-01');
   const rows=data||[];
   const M={};rows.forEach(r=>{const k=(r.air_at||'').slice(0,7);if(!k)return;
     (M[k]=M[k]||{s:0,p:0}).s+=(+r.판매매출||0);M[k].p+=(+r.잠정손익||0);});
@@ -4441,7 +4471,7 @@ async function agCharts(){
   const from=v.from||(y+'-01'), to=v.to||(y+'-12');
   const {data}=await sb.from('hs_v_settle_flash')
     .select('air_at,channel_name,brand_name,판매매출,잠정손익,대행수수료율')
-    .eq('deal_type','대행').gte('air_at',from+'-01').lte('air_at',to+'-31');
+    .eq('deal_type','대행').gte('air_at',kstYmStart(from)||'1900-01-01').lt('air_at',kstYmStart(ymNext(to))||'2999-01-01');
   const rows=data||[];
   const M={};rows.forEach(r=>{const k=(r.air_at||'').slice(0,7);if(!k)return;
     (M[k]=M[k]||{s:0,p:0}).s+=(+r.판매매출||0);M[k].p+=(+r.잠정손익||0);});
@@ -5928,7 +5958,19 @@ function netSettle(gross,s){const g=+gross||0;
 async function renderSettleCal(y,mo){
   $('calHint').textContent='홈사별 정산주기로 방송의 입금 예정일을 계산해 표시합니다 (정산대금=매출−수수료 × 지급률, 예상치 · 대행 제외).';
   const from=new Date(y,mo-1,1).toISOString(),to=new Date(y,mo+1,1).toISOString();
-  const {data:sch}=await sb.from('hs_schedules').select('id,channel_id,product_name,air_at,deal_type,target_sales,fee_type,fee_amount,commission_rate').gte('air_at',from).lt('air_at',to).order('air_at');
+  /* 이 화면은 «금액»을 계산하므로 원본 표를 읽는다 — 정액비·수수료율이 필요한데
+     공개 뷰(hs_v_schedule_open)에는 그 칸이 없다. 즉 홈쇼핑팀 전용이 맞다.
+     다만 다른 팀에게는 «빈 달력»으로 보인다. 2026-09-02 에 편성 캘린더만 열고
+     이쪽은 그대로 뒀는데, 빈 화면은 「데이터가 없나 보다」로 오해된다. 그래서 말해 준다. */
+  const {data:sch,error:schErr}=await sb.from('hs_schedules').select('id,channel_id,product_name,air_at,deal_type,target_sales,fee_type,fee_amount,commission_rate').gte('air_at',from).lt('air_at',to).order('air_at');
+  if(!schErr&&(!sch||!sch.length)){
+    const {data:anyOpen}=await sb.from('hs_v_schedule_open').select('id').gte('air_at',from).lt('air_at',to).limit(1);
+    if(anyOpen&&anyOpen.length){
+      $('calHint').innerHTML='<span style="color:#B91C1C"><b>정산 달력은 홈쇼핑팀만 볼 수 있습니다.</b> 정액비·수수료율이 들어 있어서입니다 — 방송 일정은 위 「편성」 달력에서 보실 수 있습니다.</span>';
+      $('calGrid').innerHTML='<div class="state">정산 달력은 홈쇼핑팀 전용입니다</div>';
+      return;
+    }
+  }
   const rows=(sch||[]).filter(s=>(s.deal_type||'자사')!=='대행');   // 대행은 월 수수료 별도 정산 → 캘린더 제외
   const ids=rows.map(s=>s.id),resMap={};
   if(ids.length){const {data:rs}=await sb.from('hs_results').select('schedule_id,gross_sales').in('schedule_id',ids);(rs||[]).forEach(r=>{if(r.gross_sales!=null)resMap[r.schedule_id]=+r.gross_sales;});}
@@ -6182,9 +6224,28 @@ function syncOnairFromTicks(){
 }
 function renderKpis(){const T=compTotals(),total=T.preAmt+T.onAmt,tg=+BC.target_sales||0;
   $('bcKpis').innerHTML=[['주문매출목표',won(tg)],['미리주문매출',won(T.preAmt)],['방송중매출',won(T.onAmt)],['총매출',won(total),'hi'],['달성률',(tg?Math.round(total/tg*100):0)+'%','hi']].map(k=>`<div class="kbox ${k[2]||''}"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');}
+/* 세트코드 없는 구성을 «자사 방송에서만» 경고한다.
+   대행 방송은 코드가 없는 것이 정상이다 — 원가가 광고주 것이라 우리가 붙일 코드가 없다.
+   실측(2025-01~): 대행 162건 전부 코드없음 · 자사 44건 중 10건.
+   대행까지 경고하면 매일 울리고, 그러면 아무도 안 본다. */
+function compNoCode(){
+  if(!BC||BC.deal_type==='대행')return null;
+  const bad=COMPS.filter(c=>!(c.set_code&&String(c.set_code).trim())
+                          &&((+c.preorder_qty||0)+(+c.onair_qty||0))>0);
+  if(!bad.length)return null;
+  const amt=bad.reduce((a,c)=>a+((+c.preorder_qty||0)+(+c.onair_qty||0))*(+c.price||0),0);
+  const T=compTotals(), tot=T.preAmt+T.onAmt;
+  return {rows:bad, amt, pct:tot?Math.round(amt/tot*100):0};
+}
 function updCompNote(){const T=compTotals();const lastTick=TICKS.filter(t=>t.sales_amt!=null).slice(-1)[0];const tv=lastTick?+lastTick.sales_amt:0;
   const el=$('compNote');if(!el)return;
-  el.innerHTML=`방송중 매출(구성 입력) <b>${won(T.onAmt)}</b> · 실시간 틱 누적매출 <b>${won(tv)}</b>${(tv&&T.onAmt&&Math.abs(tv-T.onAmt)>T.onAmt*0.02)?' <span style="color:var(--blocked)">· 구성 수량과 틱 누적이 다릅니다</span>':''}`;}
+  const nc=compNoCode();
+  el.innerHTML=`방송중 매출(구성 입력) <b>${won(T.onAmt)}</b> · 실시간 틱 누적매출 <b>${won(tv)}</b>${(tv&&T.onAmt&&Math.abs(tv-T.onAmt)>T.onAmt*0.02)?' <span style="color:var(--blocked)">· 구성 수량과 틱 누적이 다릅니다</span>':''}`
+   +(nc?`<div style="margin-top:7px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 11px;color:#7F1D1D;font-size:12px;line-height:1.6">
+      <b>세트코드 없는 구성이 ${nc.rows.length}개 있습니다 — ${won(nc.amt)}원 (매출의 ${nc.pct}%)</b><br>
+      ${nc.rows.map(c=>'· '+esc(c.name||'')).join('<br>')}<br>
+      코드가 없으면 «품목원가»가 안 붙고 <b>원가율 ${Math.round((+$('fCost').value||27))}%로 추정</b>됩니다. 손익이 실제와 달라집니다.<br>
+      구성을 지우고 「상품에서 추가」로 다시 넣으시면 코드가 붙습니다. 상품 목록에 없으면 상품 등록이 먼저입니다.</div>`:'');}
 function renderComp(){const T=compTotals(),SpreA=T.preAmt,SonA=T.onAmt,dis='';   // 구성은 방송 후에도 입력 가능
   $('compBody').innerHTML=COMPS.map((c,i)=>{const price=+c.price||0,preQ=+c.preorder_qty||0,onQ=+c.onair_qty||0,preA=price*preQ,onA=price*onQ,tot=preA+onA;
     return `<tr><td class="l"><span title="${esc(c.name||'')}">${esc((c.name||'').slice(0,38))}</span>`
@@ -6448,10 +6509,12 @@ $('saveBc').onclick=async()=>{const ok=await saveSchedule(true);if(!ok)return;
    if(total>0){const resRow={schedule_id:BC.id,tenant_id:BC.tenant_id||null,gross_sales:total,conversion_rate:conv,pre_order_amount:T.preAmt,cost_amount:((REAL_COST&&REAL_COST.full_match&&+REAL_COST.real_cost>0)?Math.round(+REAL_COST.real_cost):Math.round(total*conv*costR)),sold_qty:Math.round((T.pre+T.on)||0),updated_by:$('who').textContent};
      const {data:ex}=await sb.from('hs_results').select('id').eq('schedule_id',BC.id).maybeSingle();
      if(ex)await sb.from('hs_results').update(resRow).eq('schedule_id',BC.id);else await sb.from('hs_results').insert(resRow);}}
+  {const nc=compNoCode();
+   if(nc)toast(`저장했습니다 · 세트코드 없는 구성 ${nc.rows.length}개(${won(nc.amt)}원)는 원가가 추정으로 잡힙니다`,'warn');}
   COMP_SAVED=(COMPS.length>0);applyLock();applyDraftGate();
   act('write','save','hs_results',{comps:COMPS.length,ticks:TICKS.length},'lead',BC.id);
   toast('방송 저장 완료 · 방송직후 실적 반영','ok');};
-$('genReport').onclick=()=>{const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null,total=T.preAmt+T.onAmt,tg=+s.target_sales||0,conv=s.conv_rate||0,tax=s.tax_type==='과세'?'VAT포함':'면세';
+$('genReport').onclick=()=>{const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null,total=T.preAmt+T.onAmt,tg=+s.target_sales||0,conv=settleConv(s).v,tax=s.tax_type==='과세'?'VAT포함':'면세';
   let r=`[${BCH[s.channel_id]||''} ${s.product_name||''}]\n`;if(s.program_name)r+=`${s.program_name}\n`;
   r+=`${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}(${DOW[d.getDay()]}) ${hhmm(d)}${e?'~'+hhmm(e):''}\n`;
   r+=(s.fee_type==='정액'?`정액비 ${baekman(s.fee_amount)}백만원 (VAT별도)${s.backmargin_rate?` + 수수료 ${Math.round(s.backmargin_rate*100)}%`:''}`:`정률 ${Math.round((s.commission_rate||0)*100)}%`)+`\n`;
@@ -6472,13 +6535,16 @@ $('closeRep').onclick=()=>$('repMask').style.display='none';
 $('copyRep').onclick=()=>{navigator.clipboard.writeText($('repText').textContent);toast('텍스트 복사됨','ok');};
 
 // ===== 방송기준 정산서 (플랫폼 디자인) =====
+/* 전환율은 «한 곳에서만» 정한다 — 확정 실적 → 편성 → 없음.
+   정산서와 보고용 멘트가 각각 정하면 같은 방송이 두 숫자가 된다. */
+function settleConv(s){
+  if(SETTLE_RES&&SETTLE_RES.conversion_rate!=null)return {v:+SETTLE_RES.conversion_rate,missing:false,src:'실적'};
+  if(s&&s.conv_rate!=null)return {v:+s.conv_rate,missing:false,src:'편성'};
+  return {v:0,missing:true,src:null};
+}
 function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null;
   const total=T.preAmt+T.onAmt,tg=+s.target_sales||0;
-  // 전환율 — 확정 실적이 있으면 그것이 맞다. 없으면 편성. 둘 다 없으면 «계산하지 않는다».
-  const convRes=(SETTLE_RES&&SETTLE_RES.conversion_rate!=null)?+SETTLE_RES.conversion_rate:null;
-  const convSch=(s.conv_rate!=null)?+s.conv_rate:null;
-  const conv=(convRes!=null?convRes:(convSch!=null?convSch:0));
-  const convMissing=(convRes==null&&convSch==null);
+  const CV=settleConv(s), conv=CV.v, convMissing=CV.missing;
   const taxed=(s.tax_type==='과세'),vatDiv=taxed?1.1:1;
   // 면세: 매입세액 공제가 안 돼 정액비·PPL비의 VAT가 실비용 → 비용에 VAT 포함(×1.1). 과세: VAT별도.
   const vatFee=taxed?1:1.1;
@@ -6567,13 +6633,19 @@ async function openSettleReport(id){if(!id)return;
 
      실적 저장 쪽은 같은 자리를 `BC.conv_rate||0.8` 로 쓰고 있었다 —
      같은 값을 두 곳이 다르게 정하고 있었다. 확정 실적을 «먼저» 본다. */
-  const {data:res}=await sb.from('hs_results').select('conversion_rate,gross_sales,sold_qty').eq('schedule_id',id).maybeSingle();
-  SETTLE_RES=res||null;
-  BC=s;COMPS=c||[];await loadRealCost(id);showSettle();}
-let SETTLE_RES=null;
+  BC=s;COMPS=c||[];await loadRealCost(id);showSettle();}   // 확정 실적은 loadRealCost 가 같이 읽는다
 // 구성 → 세트코드 → 품목/BOM 원가 (없으면 원가율 폴백)
-let REAL_COST=null,SETTLE_DUE=null;
-async function loadRealCost(id){REAL_COST=null;SETTLE_DUE=null;if(!id)return;
+let REAL_COST=null,SETTLE_DUE=null,SETTLE_RES=null;
+/* 정산서에 필요한 것을 «여기 한 곳에서» 채운다.
+   2026-09-02 — 전환율을 고치면서 SETTLE_RES 를 openSettleReport 안에서만 채웠다.
+   그런데 정산서 입구가 둘이다(결산표 클릭 · 방송상세의 「정산서」 버튼).
+   버튼 쪽은 안 채우고 «지우지도» 않아서, 직전에 열어 본 «다른 방송의 전환율»이 남았다.
+   그러면 남의 값으로 손익이 계산되고 「전환율 미입력」 경고도 안 뜬다.
+   고치려던 것과 똑같은 사고를 한 칸 옆에 만들었다.
+   그래서 상태를 채우는 자리를 하나로 모은다. 두 입구 다 이 함수를 부른다. */
+async function loadRealCost(id){REAL_COST=null;SETTLE_DUE=null;SETTLE_RES=null;if(!id)return;
+  try{const {data:res}=await sb.from('hs_results').select('conversion_rate,gross_sales,sold_qty')
+        .eq('schedule_id',id).maybeSingle(); SETTLE_RES=res||null;}catch(_){}
   const {data}=await sb.from('hs_v_schedule_cost').select('*').eq('schedule_id',id).maybeSingle();
   if(data&&data.full_match&&+data.real_cost>0)REAL_COST=data;else if(data)REAL_COST={...data,full_match:false};
   /* 입금예정일은 방송 원장이 아니라 수금 원장(hs_collections)에 있다 — 예상 정산액 옆에 같이 보여준다 */

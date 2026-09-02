@@ -1261,7 +1261,9 @@ body.acker-max main{padding-right:30px}
         <button class="btn sm" id="mtRec" title="녹음합니다. 끝내면 서버가 전사하고 요약까지 만듭니다.">🎙 녹음</button>
         <button class="btn sm" id="mtSum">✦ 정리하기</button>
         <button class="btn sm" id="mtAlt" style="display:none" title="다른 모델(Flash-Lite)이 전사한 결과와 번갈아 봅니다">⇄ 다른 모델</button>
+        <button class="btn sm primary" id="mtResume" style="display:none" title="이미 끝난 구간은 건너뛰고 남은 것만 이어서 전사합니다">↻ 전사 이어서</button>
       </div>
+      <div id="mtStuck" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:10px 13px;margin-bottom:8px;font-size:12.5px;color:#7F1D1D;line-height:1.6"></div>
       <div id="mtRecBar" style="display:none;background:var(--bg1);border:1px solid var(--line1);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:12px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span id="mtRecDot" style="width:9px;height:9px;border-radius:50%;background:#E11D48;display:inline-block"></span>
@@ -1844,19 +1846,32 @@ async function questPing(){
   const wait=rows.filter(r=>r.status==='reported').length;
   const mine=rows.filter(r=>qMine(r)&&['open','doing'].includes(r.status));
   const over=mine.filter(r=>r.due_at&&new Date(r.due_at)<new Date()).length;
-  const n=boss?wait:mine.length;
+  /* 🔴 2026-09-02 — 임원은 «자기 앞으로 온 지시»를 못 보고 있었다.
+     qIsBoss() 가 참이면 배지·배너·팝업이 전부 «남의 완료 보고»만 봤다.
+     김진호 이사 앞으로 온 2건이 그래서 12일·14일을 갔다.
+     그중 하나가 「방송 실적 미입력 29건 — 팀에 나눠 채워주세요」였고,
+     그 미입력이 오늘 대표 질문(「왜 어제 방송이 정산에 안 잡히나」)으로 돌아왔다.
+
+     지시를 내리는 사람도 지시를 받는다. 둘을 «함께» 보여준다. */
+  const waitRows=rows.filter(r=>r.status==='reported');
+  const n=mine.length+(boss?wait:0);
   const b=$('qNavBadge');if(b){b.style.display=n?'':'none';b.textContent=n;}
   const bn=$('qBanner');if(!bn)return;
-  if(boss&&wait){$('qBannerTxt').innerHTML=`팀원이 완료 보고한 업무 <b>${wait}건</b>이 확인을 기다리고 있습니다.`;bn.style.display='flex';}
-  else if(!boss&&mine.length){$('qBannerTxt').innerHTML=`나에게 지시된 업무 <b>${mine.length}건</b>이 있습니다.${over?` (기한 초과 <b style="color:#B91C1C">${over}건</b>)`:''} 끝내면 완료 보고를 눌러주세요.`;bn.style.display='flex';}
-  else bn.style.display='none';
+  if(n){
+    const parts=[];
+    if(mine.length)parts.push(`나에게 지시된 업무 <b>${mine.length}건</b>${over?` (기한 초과 <b style="color:#B91C1C">${over}건</b>)`:''}`);
+    if(boss&&wait)parts.push(`팀원이 완료 보고한 업무 <b>${wait}건</b>`);
+    $('qBannerTxt').innerHTML=parts.join(' · ')+(mine.length?' — 끝내면 완료 보고를 눌러주세요.':' 확인을 기다리고 있습니다.');
+    bn.style.display='flex';
+  } else bn.style.display='none';
   /* 「오늘 안 보기」는 서버(hs_quest_mute)에 담는다 — 브라우저마다 따로 기억하던 것을 고쳤다.
      읽기가 실패해도 팝업은 떠야 한다(안 뜨는 것보다 두 번 뜨는 게 낫다). */
   let qMute=null;
   try{ const {data:qm}=await sb.from('hs_quest_mute').select('mute_date,ids')
         .eq('user_id',(ME&&ME.user_id)||'00000000-0000-0000-0000-000000000000').maybeSingle();
        qMute=qm||null; }catch(_){}
-  questNotice(boss?rows.filter(r=>r.status==='reported'):mine, boss, over, qMute);
+  // 내 일이 «먼저». 남의 완료 보고는 그 뒤에 붙인다
+  questNotice(boss?mine.concat(waitRows):mine, boss, over, qMute);
 }
 // 구성 판매가 입력 진행률 — 지시가 끝날 때까지 접속할 때마다 남은 항목을 보여준다
 async function presetProgress(){
@@ -1911,9 +1926,15 @@ function questNotice(list,boss,over,qMute){
   const 새로운게있나=ids.some(id=>muted.indexOf(id)<0);
   if(muted.length && !새로운게있나) return;
   const nameOf=i=>(Q.members.find(m=>m.user_id===i)||{}).name||'-';
-  $('qNoticeTitle').textContent=boss?'확인 대기 중인 완료 보고':'나에게 온 업무 지시';
-  $('qNoticeSub').textContent=boss?`${list.length}건이 확인을 기다리고 있습니다`
-    :`${list.length}건${over?` · 기한 초과 ${over}건`:''} — 끝내면 완료 보고를 눌러주세요`;
+  // 목록이 섞일 수 있다 — 「내 일」과 「남의 완료 보고」를 세어서 제목을 정한다
+  const mineN=list.filter(r=>r.status!=='reported').length;
+  const repN =list.filter(r=>r.status==='reported').length;
+  $('qNoticeTitle').textContent = (mineN&&repN)?'내 업무 · 확인 대기'
+    : (repN?'확인 대기 중인 완료 보고':'나에게 온 업무 지시');
+  $('qNoticeSub').textContent = [
+    mineN?`나에게 온 ${mineN}건${over?` · 기한 초과 ${over}건`:''}`:'',
+    repN ?`확인 대기 ${repN}건`:''
+  ].filter(Boolean).join('  ·  ') + (mineN?' — 끝내면 완료 보고를 눌러주세요':'');
   $('qNoticeBody').innerHTML=list.slice(0,8).map(r=>{
     const od=r.due_at&&new Date(r.due_at)<new Date()&&['open','doing'].includes(r.status);
     const p=Q_PRIO[r.priority]||Q_PRIO.normal;
@@ -1922,7 +1943,8 @@ function questNotice(list,boss,over,qMute){
         <b style="font-size:13px">${esc(r.title||'')}</b>
         <span style="color:${p[1]};font-size:10.5px;font-weight:700">${p[0]}</span>
         ${od?'<span class="chip" style="background:#FEE2E2;color:#B91C1C">기한초과</span>':''}
-        ${boss?`<span class="muted" style="font-size:11px">${esc(nameOf(r.assignee_id))}</span>`:''}
+        ${(r.assignee_id&&ME&&r.assignee_id!==ME.user_id)?`<span class="muted" style="font-size:11px">${esc(nameOf(r.assignee_id))}</span>`:''}
+        ${(r.status==='reported')?'<span class="chip" style="background:#E0F2FE;color:#075985">확인 대기</span>':''}
       </div>
       <div class="muted" style="font-size:11.5px;white-space:pre-wrap;line-height:1.5">${esc(String(r.body||'').slice(0,150))}${String(r.body||'').length>150?'…':''}</div>
       ${r.due_at?`<div class="muted" style="font-size:11px;margin-top:5px">기한 ${esc(String(r.due_at).slice(0,10))}</div>`:''}
@@ -6120,8 +6142,33 @@ function applyDraftGate(){const isNew=!!(BC&&BC.__new);
   const dg=$('delBc');if(dg)dg.textContent=isNew?'취소':'삭제';}
 $('saveComp').onclick=saveComps;
 function compTotals(){let pre=0,on=0,preAmt=0,onAmt=0;COMPS.forEach(c=>{pre+=+c.preorder_qty||0;on+=+c.onair_qty||0;preAmt+=(+c.price||0)*(+c.preorder_qty||0);onAmt+=(+c.price||0)*(+c.onair_qty||0);});return{pre,on,preAmt,onAmt};}
-// 실시간 틱의 최종 누적수량 → 구성별 방송중 수량으로 반영 (현장 틱 입력이 결산까지 이어지게)
-function syncOnairFromTicks(){if(!TICKS.length)return;const last=TICKS[TICKS.length-1],q=last.comp_qtys||{};COMPS.forEach(c=>{if(q[c.seq]!=null)c.onair_qty=+q[c.seq]||0;});}
+/* 실시간 틱의 최종 누적수량 → 구성별 방송중 수량으로 반영 (현장 틱 입력이 결산까지 이어지게)
+
+   🔴 2026-09-02 — 「배열의 맨 마지막 틱」을 쓰고 있었다. 그게 «빈 틱»이면 아무것도 안 넘어간다.
+   틱은 1분마다 «미리» 만들어 두고 사람이 입력하는 구조라, 방송 끝 무렵 한두 칸은 늘 비어 있다.
+   그래서 마지막 1분에 입력이 있었느냐 없었느냐로 결산에 잡히고 안 잡히고가 갈렸다.
+
+   2026-09-01 NS 방송이 그랬다 —
+     13:44  콜 19 · 구성 {1:296, 2:84} · 누적 127,620,000
+     13:45  콜 —  · 구성 {}                       ← 이 줄을 봤다
+   그래서 onair_qty 가 0으로 남고, total=0 이라 hs_results 저장을 통째로 건너뛰었다.
+   결산 뷰는 hs_results 를 INNER JOIN 하므로 «그 방송이 목록에서 사라졌다».
+
+   콜현황 화면(/c/)은 같은 파일 안에서 이미 «값이 있는 마지막 틱»을 쓰고 있었다(tickLastCum·li).
+   즉 화면에는 1.27억이 보이는데 결산에만 없었다. 대표가 본 것이 정확히 그것이다.
+
+   고침 — 여기도 «값이 있는 마지막 틱»을 쓴다. 누적값이라 그게 최종값이다. */
+function syncOnairFromTicks(){
+  if(!TICKS.length)return;
+  let last=null;
+  for(const t of TICKS){
+    const q=t.comp_qtys;
+    if(q&&Object.values(q).some(v=>+v>0))last=t;   // 값이 «있는» 마지막
+  }
+  if(!last)return;
+  const q=last.comp_qtys||{};
+  COMPS.forEach(c=>{if(q[c.seq]!=null)c.onair_qty=+q[c.seq]||0;});
+}
 function renderKpis(){const T=compTotals(),total=T.preAmt+T.onAmt,tg=+BC.target_sales||0;
   $('bcKpis').innerHTML=[['주문매출목표',won(tg)],['미리주문매출',won(T.preAmt)],['방송중매출',won(T.onAmt)],['총매출',won(total),'hi'],['달성률',(tg?Math.round(total/tg*100):0)+'%','hi']].map(k=>`<div class="kbox ${k[2]||''}"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');}
 function updCompNote(){const T=compTotals();const lastTick=TICKS.filter(t=>t.sales_amt!=null).slice(-1)[0];const tv=lastTick?+lastTick.sales_amt:0;
@@ -6322,6 +6369,27 @@ async function saveSchedule(silent){
     const {data,error}=await sb.from('hs_schedules').insert({...row,status:st,tenant_id:BC.tenant_id||null}).select().single();
     if(error){toast('저장 실패 — '+dbMsg(error),'err');return false;}BC=data;BC.__new=false;}
   else{const {error}=await sb.from('hs_schedules').update(row).eq('id',BC.id);err=error;}
+
+  /* 방송 시각을 바꾸면 콜판(틱)도 «따라 옮긴다».
+     전에는 틱 생성이 `if(tickEditable()&&!TICKS.length)` 라 «틱이 하나도 없을 때만» 만들었다.
+     그래서 11:25 로 만들어 둔 뒤 11:35 로 고쳐 저장해도 콜판은 11:25 그대로였다.
+     (신현아 주임 개발요청 2026-09-01 「콜판 시간」)
+
+     다시 «만들지» 않고 «옮긴다» — 이미 찍어 둔 콜·수량이 날아가면 안 되기 때문이다.
+     시각만 통째로 밀고, 길이가 달라졌으면 그 뒤에 genTicksNow 가 앞뒤를 정리한다
+     (그 함수는 시각이 맞는 틱을 그대로 살린다). */
+  if(!wasNew && err==null && TICKS.length && BC.air_at && airIso){
+    const shift=new Date(airIso).getTime()-new Date(BC.air_at).getTime();
+    if(shift!==0){
+      TICKS.forEach(t=>{t.tick_at=new Date(new Date(t.tick_at).getTime()+shift).toISOString();});
+      const m=Math.round(shift/60000);
+      toast(`콜판 시각도 ${m>0?'+':''}${m}분 옮겼습니다`,'ok');
+      BC.air_at=airIso;BC.air_end=endIso;   // genTicksNow 가 새 구간을 보게 한다
+      try{ genTicksNow(true); }catch(_){}
+      try{ await syncTicksFull(); }catch(_){}
+    }
+  }
+
   Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_id:row.ppl_id,cost_rate:row.cost_rate,backmargin_rate:row.backmargin_rate,agency_fee_rate:row.agency_fee_rate,program_name:row.program_name,show_host:row.show_host,pd:row.pd,md:row.md,color:row.color});
   {const d2=new Date(airIso),e2=endIso?new Date(endIso):null;$('bcTitle').textContent=`${BCH[BC.channel_id]||''} ${BC.product_name||''}`;$('bcSub').textContent=`${d2.getFullYear()}.${d2.getMonth()+1}.${d2.getDate()}(${DOW[d2.getDay()]}) ${hhmm(d2)}${e2?'~'+hhmm(e2):''} · ${feeType==='정액'?('정액 '+baekman(BC.fee_amount)+'백만'):('정률 '+Math.round((BC.commission_rate||0)*100)+'%')}`;}
   applyLock();applyDraftGate();
@@ -7216,7 +7284,55 @@ async function mtOpen(id){
   if(auto.length)$('mt_chips').insertAdjacentHTML('beforeend',auto.map(l=>
     `<span title="본문에서 자동으로 찾은 연결" style="background:var(--bg2,#F1F5F9);color:var(--ink3);border-radius:8px;padding:2px 8px;font-size:11px">${l.ref_type==='brand'?'브랜드':'방송'} · ${esc(l.ref_label||'')} <span style="opacity:.55">자동</span></span>`).join(''));
   mtActs();$('mtMsg').textContent='';
+  await mtStuckCheck(id, m);
   $('mtMask').style.display='flex';
+}
+
+/* 전사가 «중간에 멈춘» 회의를 사람이 알아볼 수 있게 한다.
+   2026-08-26·08-27 두 건이 「전사 중」인 채로 각각 7일·6일을 서 있었다.
+   조각은 저장소에 다 올라가 있었고 김진호 대표님 건은 «전사까지 다 끝나» 있었는데
+   마지막에 합쳐 넣는 단계에서 죽어, 회의록에는 한 글자도 안 들어갔다.
+   엣지 함수는 백그라운드 작업이라 죽어도 아무 데도 안 남는다. 목록에는 그냥 「전사 중」으로 보인다.
+
+   그래서 두 가지를 한다 — «멈췄다고 말해 주고», «이어서 돌릴 버튼»을 준다.
+   run() 은 이미 끝난 구간을 건너뛰므로 다시 눌러도 돈이 두 번 들지 않는다. (2026-09-02) */
+async function mtStuckCheck(id, m){
+  const box=$('mtStuck'), btn=$('mtResume');
+  if(!box||!btn)return;
+  box.style.display='none'; btn.style.display='none';
+
+  /* 상태는 «반드시» 이 RPC 로 본다.
+     co_meeting_get 은 stt_status 를 돌려주지 않는다 — 처음엔 m.stt_status 를 보고 판단하게 짰다가
+     그러면 배너가 «영영 안 뜨는» 것을 배포 전에 잡았다. 있는 줄 알았던 값이 없었다. */
+  let st=null;
+  try{ const r=await sb.rpc('co_meeting_stt_status',{p_id:id}); st=r&&r.data; }catch(_){}
+  if(!st)return;
+  const cur=st.stt_status||'';
+  if(cur!=='transcribing' && cur!=='failed')return;
+
+  const tot=st.segments||0, done=st.done||0, failed=st.failed||0;
+  if(!tot){
+    box.style.display='';
+    box.innerHTML='<b>녹음 구간이 하나도 저장되지 않았습니다.</b> 전사할 것이 없습니다 — 녹음 파일이 올라가기 전에 끊겼을 수 있습니다.'
+      +(st.error?`<br><span style="opacity:.8">서버가 남긴 말: ${esc(String(st.error))}</span>`:'');
+    return;
+  }
+
+  // 언제부터 멈췄는지 — co_meeting_get 에 시각이 없어 원장에서 직접 본다. 못 읽으면 그냥 생략한다.
+  let 얼마나='';
+  try{
+    const {data:t}=await sb.from('co_meeting').select('updated_at').eq('id',id).maybeSingle();
+    if(t&&t.updated_at){
+      const mins=Math.round((Date.now()-new Date(t.updated_at).getTime())/60000);
+      얼마나 = mins>2880?`${Math.floor(mins/1440)}일째 ` : (mins>90?`${Math.floor(mins/60)}시간째 ` : `${mins}분째 `);
+    }
+  }catch(_){}
+
+  box.style.display=''; btn.style.display='';
+  box.innerHTML=`<b>전사가 ${얼마나}멈춰 있습니다.</b> 녹음 ${tot}구간 중 ${done}구간이 끝났습니다`
+    +(failed?` (실패 ${failed})`:'')+`.<br>`
+    +`녹음 파일은 <b>그대로 남아 있습니다.</b> 「↻ 전사 이어서」를 누르면 <b>끝난 구간은 건너뛰고</b> 남은 것만 이어서 합니다.`
+    +(done>=tot?` 지금은 구간이 다 끝나 있어, 누르면 <b>합쳐서 요약까지</b> 만들고 끝납니다.`:'');
 }
 
 /* ── 화자 지정 ─────────────────────────────────────────────
@@ -7609,6 +7725,13 @@ function bcMeetNew(type){
   on('mtClose',async()=>{if(MT.recOn&&!confirm('녹음 중입니다. 끝내고 전사할까요?'))return;
     await mtRecStop();$('mtMask').style.display='none';});
   on('mtSave',mtSave);on('mtRec',mtRecToggle);on('mtSum',mtSummarize);on('mtCopy',mtCopyText);
+  on('mtResume',async()=>{
+    if(!MT.cur||!MT.cur.id)return;
+    const b=$('mtResume');b.disabled=true;b.textContent='이어서 하는 중…';
+    $('mtStuck').innerHTML='<b>이어서 전사하고 있습니다.</b> 창을 닫으셔도 서버에서 계속 돕니다 — 잠시 뒤 목록에서 다시 열어보시면 됩니다.';
+    try{ await mtTranscribe(MT.cur.id); }
+    finally{ b.disabled=false;b.textContent='↻ 전사 이어서'; }
+  });
   on('mtAlt',()=>{
     if(!MT.altText)return;
     MT.altOn=!MT.altOn;

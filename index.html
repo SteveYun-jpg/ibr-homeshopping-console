@@ -5817,7 +5817,12 @@ async function loadBcCal(){$('bcDetail').classList.add('hidden');$('bcBoard').cl
   $('calHint').innerHTML='날짜 칸을 클릭하면 그 날짜로 편성을 추가합니다. 방송을 클릭하면 상세로 들어갑니다.';
   await Promise.all([loadLineColors(), ensureBrandNames()]);   // 색 + 브랜드명 (둘 다 있어야 색이 잡힌다)
   if(CAL_FIND)await calBrands();
-  const {data}=await sb.from('hs_schedules').select('id,channel_id,product_name,air_at,air_end,status,color,ppl_note,ppl_cost,deal_type,target_sales,fee_type,brand_id,line').gte('air_at',new Date(y,mo,1).toISOString()).lt('air_at',new Date(y,mo+1,1).toISOString()).order('air_at');
+  /* 캘린더는 «공개 뷰»를 읽는다 (2026-09-02).
+     hs_schedules 는 RLS 가 홈쇼핑팀만 허용해서, 운영지원·BM 계정에는 캘린더가 통째로 비어 있었다
+     (김다영 주임 08-26 · 유재욱 부장 09-02 개발요청). 버그가 아니라 권한이었다.
+     표를 통째로 열면 수수료율·원가율·특약비까지 나가므로, 칸을 가린 뷰를 따로 뒀다.
+     칸 이름이 같아 아래 코드는 그대로다. 홈쇼핑팀에게는 fee_type·ppl_cost 도 그대로 온다. */
+  const {data}=await sb.from('hs_v_schedule_open').select('id,channel_id,product_name,air_at,air_end,status,color,ppl_note,ppl_cost,deal_type,target_sales,fee_type,brand_id,line').gte('air_at',new Date(y,mo,1).toISOString()).lt('air_at',new Date(y,mo+1,1).toISOString()).order('air_at');
   const ids=(data||[]).map(s=>s.id);const resMap={};
   if(ids.length){const {data:rs}=await sb.from('hs_results').select('schedule_id,gross_sales').in('schedule_id',ids);(rs||[]).forEach(r=>{if(r.gross_sales!=null)resMap[r.schedule_id]=+r.gross_sales;});}
   renderCalSummary(data||[],resMap,y,mo);
@@ -6039,7 +6044,13 @@ $('delBc').onclick=async()=>{if(!BC)return;
   const {error}=await sb.from('hs_schedules').delete().eq('id',BC.id);
   if(error){toast('삭제 실패 — '+dbMsg(error),'err');return;}toast('편성 삭제됨','ok');loadBcCal();};
 async function openBc(id,push){if(push===undefined)push=true;
-  const {data:s}=await sb.from('hs_schedules').select('*').eq('id',id).single();if(!s)return;BC=s;BC.__new=false;
+  const {data:s}=await sb.from('hs_schedules').select('*').eq('id',id).single();
+  if(!s){
+    // 캘린더는 전 직원이 보지만 «상세»는 홈쇼핑팀만 연다. 전에는 아무 일도 안 일어나 고장처럼 보였다.
+    toast('방송 상세는 홈쇼핑팀만 볼 수 있습니다 — 일정은 캘린더에서 확인하실 수 있습니다','warn');
+    return;
+  }
+  BC=s;BC.__new=false;
   const {data:c}=await sb.from('hs_broadcast_comp').select('*').eq('schedule_id',id).order('seq');COMPS=c||[];
   // 원가는 이 화면에서 다루지 않음 — 결산 DB에서 set_code 기준으로 계산
   const {data:t}=await sb.from('hs_broadcast_tick').select('*').eq('schedule_id',id).order('tick_at');TICKS=t||[];
@@ -6186,12 +6197,34 @@ function renderComp(){const T=compTotals(),SpreA=T.preAmt,SonA=T.onAmt,dis='';  
       +`<td><input ${dis} class="cell2" type="number" value="${onQ}" data-i="${i}" data-f="onair_qty"></td>`
       +`<td>${won(onA)}</td><td>${SonA?Math.round(onA/SonA*100):0}%</td>`
       +`<td style="font-weight:700">${won(tot)}</td>`
-      +`<td>${dis?'':`<button class="compDel" data-i="${i}" title="구성 삭제" style="border:none;background:transparent;color:var(--blocked);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px">✕</button>`}</td></tr>`;}).join('')
+      +`<td style="white-space:nowrap">${dis?'':
+          `<button class="compUp" data-i="${i}" title="위로" ${i===0?'disabled':''} style="border:none;background:transparent;color:${i===0?'var(--line1)':'var(--ink3)'};cursor:${i===0?'default':'pointer'};font-size:13px;line-height:1;padding:2px 2px">▲</button>`
+        + `<button class="compDn" data-i="${i}" title="아래로" ${i===COMPS.length-1?'disabled':''} style="border:none;background:transparent;color:${i===COMPS.length-1?'var(--line1)':'var(--ink3)'};cursor:${i===COMPS.length-1?'default':'pointer'};font-size:13px;line-height:1;padding:2px 2px">▼</button>`
+        + `<button class="compDel" data-i="${i}" title="구성 삭제" style="border:none;background:transparent;color:var(--blocked);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px">✕</button>`}</td></tr>`;}).join('')
     +(()=>{const sales=SpreA+SonA;
      return `<tr style="background:var(--bg1);font-weight:800"><td class="l">합계</td><td>–</td><td>${won(T.pre)}</td><td>${won(SpreA)}</td><td>${SpreA?'100%':'0%'}</td><td>${won(T.on)}</td><td>${won(SonA)}</td><td>${SonA?'100%':'0%'}</td><td>${won(sales)}</td><td></td></tr>`;})();
   document.querySelectorAll('#compBody input').forEach(inp=>{
     inp.addEventListener('input',()=>{const i=+inp.dataset.i,f=inp.dataset.f;COMPS[i][f]=(+inp.value||0);renderKpis();updCompNote();if(f==='price')renderTick();});
     inp.addEventListener('change',()=>renderComp());});
+  /* 구성 순서 바꾸기 (신현아 주임 개발요청 2026-09-01)
+     seq 를 바꾸면 «틱에 찍힌 구성별 수량»도 같이 따라가야 한다.
+     틱의 comp_qtys 는 seq 를 열쇠로 쓰기 때문이다 — 안 바꾸면 수량이 엉뚱한 구성에 붙는다.
+     삭제 때 이미 같은 재배치를 하고 있다(아래). 그것과 짝을 맞춘다. */
+  document.querySelectorAll('#compBody .compUp,#compBody .compDn').forEach(b=>b.onclick=()=>{
+    if(b.disabled)return;
+    const i=+b.dataset.i, dir=b.classList.contains('compUp')?-1:1, j=i+dir;
+    if(j<0||j>=COMPS.length)return;
+    const a=i+1, c=j+1;                                  // 1부터 세는 seq
+    const t0=COMPS[i]; COMPS[i]=COMPS[j]; COMPS[j]=t0;
+    COMPS.forEach((x,k)=>x.seq=k+1);
+    TICKS.forEach(t=>{const q=t.comp_qtys||{}; const va=q[a], vc=q[c];
+      if(va===undefined&&vc===undefined)return;
+      if(vc===undefined)delete q[a]; else q[a]=vc;
+      if(va===undefined)delete q[c]; else q[c]=va;
+      t.comp_qtys=q;});
+    renderComp();renderTick();
+    toast('순서 바꿈 · 「구성 저장」을 눌러 주세요','ok');
+  });
   document.querySelectorAll('#compBody .compDel').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,delSeq=i+1;
     TICKS.forEach(t=>{const q=t.comp_qtys||{},nq={};Object.keys(q).forEach(k=>{const kn=+k;if(kn===delSeq)return;nq[kn>delSeq?kn-1:kn]=q[k];});t.comp_qtys=nq;});
     COMPS.splice(i,1);COMPS.forEach((c,k)=>c.seq=k+1);renderComp();renderTick();toast('구성 삭제됨 · 다시 저장하세요','ok');});
@@ -6440,7 +6473,12 @@ $('copyRep').onclick=()=>{navigator.clipboard.writeText($('repText').textContent
 
 // ===== 방송기준 정산서 (플랫폼 디자인) =====
 function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null;
-  const total=T.preAmt+T.onAmt,tg=+s.target_sales||0,conv=s.conv_rate||0;
+  const total=T.preAmt+T.onAmt,tg=+s.target_sales||0;
+  // 전환율 — 확정 실적이 있으면 그것이 맞다. 없으면 편성. 둘 다 없으면 «계산하지 않는다».
+  const convRes=(SETTLE_RES&&SETTLE_RES.conversion_rate!=null)?+SETTLE_RES.conversion_rate:null;
+  const convSch=(s.conv_rate!=null)?+s.conv_rate:null;
+  const conv=(convRes!=null?convRes:(convSch!=null?convSch:0));
+  const convMissing=(convRes==null&&convSch==null);
   const taxed=(s.tax_type==='과세'),vatDiv=taxed?1.1:1;
   // 면세: 매입세액 공제가 안 돼 정액비·PPL비의 VAT가 실비용 → 비용에 VAT 포함(×1.1). 과세: VAT별도.
   const vatFee=taxed?1:1.1;
@@ -6496,6 +6534,9 @@ function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.air_end
       <div style="display:flex;gap:7px;margin-bottom:18px">${summ('주문목표',baekman(tg)+'백만')}${summ('판매매출',baekman(sale)+'백만')}${summ('달성률',achieve+'%',1)}${summ('전환매출',baekman(convSale)+'백만')}${summ('미리주문',baekman(pre)+'백만')}</div>
       <div style="font-size:12px;font-weight:800;color:#0D9488;margin:0 0 8px 2px">손익 산출 · ${taxed?'VAT 제외 공급가':'전환매출'} 기준</div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid #E2ECE8;border-radius:10px;overflow:hidden">
+        ${convMissing?`<tr><td colspan="2" style="padding:10px 14px;background:#FEF2F2;color:#7F1D1D;font-size:12px;line-height:1.6;border-bottom:1px solid #FCA5A5">
+          <b>전환율이 입력되지 않았습니다.</b> 아래 전환매출과 손익은 «0%로 계산된 값»이라 실제와 다릅니다.<br>
+          편성 상세에서 전환율을 넣고 저장하시면 바로 맞춰집니다. — 판매매출 ${won(total)}원은 정상입니다.</td></tr>`:''}
         <tr><td style="padding:10px 14px;background:#EDF7F3;font-weight:800;color:#0F2A3F">전환매출액${taxed?' <span style="font-weight:500;font-size:10.5px;color:#6B8078">(VAT 제외)</span>':''}</td><td style="padding:10px 14px;background:#EDF7F3;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:#0D9488">${won(convSale)}</td></tr>
         ${ded}
         <tr><td style="padding:10px 14px;background:#F5F9F7;font-weight:800">차감 합계</td><td style="padding:10px 14px;background:#F5F9F7;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:#C24A4A">-${won(deduct)}</td></tr>
@@ -6518,7 +6559,18 @@ $('genSettle').onclick=async()=>{if(BC&&BC.id)await loadRealCost(BC.id);showSett
 async function openSettleReport(id){if(!id)return;
   const {data:s}=await sb.from('hs_schedules').select('*').eq('id',id).single();if(!s){toast('편성을 찾을 수 없음','err');return;}
   const {data:c}=await sb.from('hs_broadcast_comp').select('*').eq('schedule_id',id).order('seq');
+  /* 확정 실적을 «같이» 읽는다 (2026-09-02).
+     전에는 편성(hs_schedules)만 읽어서 전환율을 s.conv_rate 로 잡았는데,
+     편성에 전환율이 비어 있으면 0 이 되어 전환매출이 0 원으로 나왔다.
+     그러면 매출은 0 인데 원가·특약비는 그대로 잡혀 «손익 −5,740만»이라는 틀린 숫자가 찍힌다.
+     이미지로 복사해 단톡에 붙이는 화면이라 더 나쁘다. (2026-09-01 NS 메리비 건)
+
+     실적 저장 쪽은 같은 자리를 `BC.conv_rate||0.8` 로 쓰고 있었다 —
+     같은 값을 두 곳이 다르게 정하고 있었다. 확정 실적을 «먼저» 본다. */
+  const {data:res}=await sb.from('hs_results').select('conversion_rate,gross_sales,sold_qty').eq('schedule_id',id).maybeSingle();
+  SETTLE_RES=res||null;
   BC=s;COMPS=c||[];await loadRealCost(id);showSettle();}
+let SETTLE_RES=null;
 // 구성 → 세트코드 → 품목/BOM 원가 (없으면 원가율 폴백)
 let REAL_COST=null,SETTLE_DUE=null;
 async function loadRealCost(id){REAL_COST=null;SETTLE_DUE=null;if(!id)return;

@@ -680,7 +680,7 @@ body.acker-max main{padding-right:30px}
                 <input type="text" inputmode="numeric" id="fNet" readonly title="주문매출목표와 전환율로 자동 계산됩니다" style="background:var(--bg1);color:var(--ink2)"></div>
               <div><label>전환율(%)</label><input type="number" id="fConv"></div></div>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 세금</label><select id="fTax"><option>면세</option><option>과세</option></select></div><div id="fCostBox" style="display:none"><label>원가율(%)</label><input type="number" id="fCost" value="27"></div><div id="fAgencyBox" style="display:none"><label>대행수수료(%) <span class="muted" style="font-weight:400;font-size:10.5px">우리가 업체에서 받는</span></label><input type="number" id="fAgency" step="0.1" placeholder="예: 5"><div class="muted" id="fAgencyHint" style="font-size:10.5px;margin-top:3px"></div></div><div id="fBackBox"><label>추가수수료율(%)</label><input type="number" id="fBack" value="12"></div></div>
-            <div class="row3"><div><label>차수 <span class="muted" style="font-weight:400;font-size:10.5px">브랜드·라인 기준 자동 · 수정 가능</span></label><input id="fProg" placeholder="예: 3차"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><select id="fPplSlot" style="display:none;max-width:78px"><option value="본방">본방</option><option value="재방">재방</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
+            <div class="row3"><div><label>차수 <span class="muted" style="font-weight:400;font-size:10.5px">브랜드·라인 기준 자동 · 수정 가능</span></label><input id="fProg" placeholder="예: 3차"></div><div><label>PPL</label><div style="display:flex;gap:6px;align-items:center"><select id="fPplYn" style="max-width:74px"><option value="무">무</option><option value="유">유</option></select><select id="fPplSel" style="display:none;flex:1.6;min-width:0"><option value="">— PPL 프로그램 선택 —</option></select><select id="fPplSlot" style="display:none;max-width:96px"><option value="">— 구분 —</option><option value="본방">본방</option><option value="재방">재방</option></select><select id="fPplPair" style="display:none;flex:1.4;min-width:0"><option value="">— 짝 재방 방송 선택 —</option></select><input id="fPplCost" inputmode="numeric" placeholder="비용(원)" style="display:none;flex:1;min-width:0"><input id="fPpl" style="display:none"></div><div class="muted" id="fPplHint" style="font-size:10.5px;margin-top:2px;display:none"></div></div><div><label>동시간대 타사 (채널 - 제품, 줄바꿈)</label><textarea id="fComp" rows="1" style="width:100%;border:1px solid var(--line1);border-radius:9px;padding:8px 10px;font-family:var(--font);font-size:13.5px;color:var(--ink1)"></textarea></div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;margin-bottom:13px"><div><label>쇼호스트</label><input id="fHost" placeholder="쇼호스트명"></div><div><label>PD</label><input id="fPd" placeholder="PD명"></div><div><label>담당 MD</label><input id="fMd" list="gsmd" placeholder="MD명"><datalist id="gsmd"><option>박민주 부장</option><option>장효석 이사</option><option>민정현 주임</option><option>한수진 과장</option><option>빅토리아 이사(외부)</option></datalist></div><div><label>색상</label><input type="color" id="fColor" value="#0D9488" style="width:48px;height:38px;padding:2px;border:1px solid var(--line1);border-radius:9px;cursor:pointer"></div></div>
             <div style="display:flex;align-items:center;gap:6px;margin:10px 0 6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line1)">
               <b style="font-size:12px">회의록</b><span class="muted" style="font-size:11px">이 방송에 붙습니다</span>
@@ -738,6 +738,23 @@ body.acker-max main{padding-right:30px}
       <div class="view" id="v-upload">
         <div class="sechead"><h2 class="sec">정산서 등록</h2><span class="tag">자사 · 대행</span></div>
         <p class="hint">홈사·대행사에서 받은 <b>정산서 엑셀</b>을 올려 정산 원장에 넣습니다. 홈사마다 양식이 달라 <b>컬럼 연결</b>을 한 번 확인한 뒤 저장하세요. 저장하면 결산 3뷰·부가세 양식·월별 검수에 바로 반영됩니다.</p>
+        <!-- 월별 적재 격자 — 「없는 것」을 보여주는 화면 (2026-09-03 대표 지시).
+             결산 표는 정산이 없으면 «행이 없을 뿐»이라 안 들어온 달이 어디에도 안 보였다. -->
+        <div class="card" id="gridCard" style="padding:14px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <b style="font-size:13px">월별 적재 현황</b>
+            <span class="muted" style="font-size:11.5px">자사 기준 — 대행은 정산서가 대행사로 가므로 여기 없는 것이 정상입니다</span>
+            <div class="spacer"></div>
+            <select id="gridMonths" style="width:auto;font-size:11.5px"><option value="6">최근 6개월</option><option value="12" selected>최근 12개월</option><option value="18">최근 18개월</option></select>
+            <label style="display:flex;gap:5px;align-items:center;font-size:11.5px" class="muted"><input type="checkbox" id="gridOnlyOdd"> 빠진 것만</label>
+          </div>
+          <div class="scroll" id="gridBox" style="overflow-x:auto"><div class="muted" style="font-size:11.5px">불러오는 중…</div></div>
+          <div style="display:flex;gap:14px;margin-top:9px;font-size:11px;flex-wrap:wrap" class="muted">
+            <span><b style="color:var(--brand-ink)">●</b> 정산 들어옴</span>
+            <span><b style="color:var(--blocked)">▲</b> 방송은 했는데 정산 없음</span>
+            <span>· 방송 없음</span>
+          </div>
+        </div>
         <div class="toolbar seg" id="upSeg" style="max-width:320px;margin:0 0 12px"><button class="on" data-v="self">자사</button><button data-v="agency">대행</button></div>
         <div id="upSelfHost"></div>
         <div id="upAgencyHost" class="hidden"></div>
@@ -2603,7 +2620,7 @@ function stDonut(id,arr,pal){
   chart(id,{type:'doughnut',
     data:{labels:arr.map(x=>x.k),datasets:[{data:arr.map(x=>+x.v||0),
       backgroundColor:arr.map((_,i)=>(pal||ST_PAL)[i%(pal||ST_PAL).length]),borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+    options:{responsive:true,maintainAspectRatio:false,datasets:{bar:{maxBarThickness:52}},cutout:'58%',
       plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10},padding:7}},
         tooltip:{callbacks:{label:c=>` ${c.label} ${won(c.raw)} (${Math.round(100*c.raw/tot)}%)`}}}}});
 }
@@ -2640,7 +2657,7 @@ async function stCharts(){
         {label:'잠정손익',data:ks.map(k=>eokN(M[k].p)),type:'line',borderColor:'#0F766E',
          backgroundColor:'#0F766E',borderWidth:2,tension:.25,pointRadius:3,order:1,
          segment:{borderColor:c=>c.p1.parsed.y<0?'#DC2626':'#0F766E'}}]},
-    options:{responsive:true,maintainAspectRatio:false,
+    options:{responsive:true,maintainAspectRatio:false,datasets:{bar:{maxBarThickness:52}},
       plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10},padding:7}},
         tooltip:{callbacks:{label:c=>` ${c.dataset.label} ${c.raw}억`}}},
       scales:{y:{ticks:{font:{size:10}},grid:{color:'#f0eeea'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
@@ -4587,7 +4604,7 @@ async function agCharts(){
         {label:'대행매출(위탁사)',data:ks.map(k=>eokN(M[k].s)),backgroundColor:'#BFD5DF',borderRadius:4,order:2,yAxisID:'y'},
         {label:'우리 수익',data:ks.map(k=>eokN(M[k].p)),type:'line',borderColor:'#B45309',
          backgroundColor:'#B45309',borderWidth:2,tension:.25,pointRadius:3,order:1,yAxisID:'y1'}]},
-    options:{responsive:true,maintainAspectRatio:false,
+    options:{responsive:true,maintainAspectRatio:false,datasets:{bar:{maxBarThickness:52}},
       plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10},padding:7}},
         tooltip:{callbacks:{label:c=>` ${c.dataset.label} ${c.raw}억`}}},
       scales:{
@@ -5604,21 +5621,55 @@ function pplAmount(p,slot){
   const r=(slot==='재방')?(p.rerun_ratio??0.2):(p.main_ratio??0.8);
   return Math.round(+p.unit_cost*r);
 }
+/* 짝 재방 방송 후보 — 기존 편성에서 고른다 (2026-09-03 대표 설계).
+   패키지 한 회차는 본방 노출 + 재방 노출이 같이 온다. 재방에 붙는 방송을 지정해야
+   재방분 20% 가 그 방송에 잡힌다. 지정 안 하면 20% 가 어디에도 안 잡히고 사라진다.
+   후보는 «본방 뒤 45일 이내 · 자사» 로 좁힌다 — 재방은 보통 며칠~몇 주 뒤에 나간다. */
+let PPL_PAIR_OPTS=[];
+async function loadPplPairOpts(){
+  const el=$('fPplPair'); if(!el||!BC) return;
+  const keep=el.value||BC.ppl_pair_id||'';
+  const from=BC.air_at?new Date(BC.air_at):new Date();
+  const to=new Date(from.getTime()+45*864e5);
+  try{
+    const {data}=await sb.from('hs_schedules')
+      .select('id,product_name,air_at,channel_id,ppl_slot,ppl_id')
+      .gte('air_at',from.toISOString()).lte('air_at',to.toISOString())
+      .neq('id',BC.id||'00000000-0000-0000-0000-000000000000')
+      .eq('deal_type','자사').order('air_at').limit(60);
+    PPL_PAIR_OPTS=data||[];
+  }catch(_){PPL_PAIR_OPTS=[];}
+  const kst=v=>{const d=new Date(v);return new Date(d.getTime()+9*3600e3).toISOString().slice(5,16).replace('T',' ');};
+  el.innerHTML='<option value="">— 짝 재방 방송 선택 —</option>'
+    + PPL_PAIR_OPTS.map(x=>`<option value="${x.id}">${esc(kst(x.air_at))} ${esc(BCH[x.channel_id]||'')} ${esc(x.product_name||'')}`
+        + `${x.ppl_id&&x.ppl_id!==($('fPplSel')&&$('fPplSel').value)?' ⚠다른 PPL':''}</option>`).join('');
+  if(keep)el.value=keep;
+}
 function pplApply(keepManual){
   const sel=$('fPplSel'),p=PPL_OPTS.find(x=>x.id===(sel&&sel.value));
   const slotEl=$('fPplSlot');
   const kind=p?pplKind(p):'본방';
-  // 재방만 프로그램은 슬롯이 재방으로 고정된다 — 고를 이유가 없다
+  // 재방만 프로그램(추가 유료재방)은 슬롯이 재방으로 고정된다 — 고를 이유가 없다
   if(slotEl&&p&&kind==='재방')slotEl.value='재방';
-  const slot=(kind==='재방')?'재방':((slotEl&&slotEl.value)||'본방');
+  /* 패키지는 «반드시» 본방/재방을 고르게 한다 (2026-09-03 대표 설계).
+     전에는 안 고르면 조용히 '본방'으로 잡혔다. 그래서 21건이 슬롯 비어 있는 채로 남았고,
+     그중 다수가 100% 로 들어가 재방분 20% 가 어디에도 안 잡혔다. */
+  const slot=(kind==='재방')?'재방':((slotEl&&slotEl.value)||'');
   if(slotEl)slotEl.style.display=(p&&kind==='패키지')?'block':'none';
+  {const pe=$('fPplPair');
+   if(pe)pe.style.display=(p&&kind==='패키지'&&slot==='본방')?'block':'none';
+   if(p&&kind==='패키지'&&slot==='본방')loadPplPairOpts();}
   if(!p){$('fPpl').value='';$('fPplHint').textContent='';return;}
   $('fPpl').value=p.broadcaster+' '+p.program;
-  const amt=pplAmount(p,slot);
+  // 패키지인데 구분을 안 골랐으면 금액을 «짐작해 넣지 않는다». 짐작이 그대로 굳는다.
+  const needSlot=(kind==='패키지'&&!slot);
+  const amt=needSlot?null:pplAmount(p,slot);
   const cur=+String($('fPplCost').value||'').replace(/[,\s]/g,'');
-  if(!keepManual||!cur)$('fPplCost').value=amt!=null?Number(amt).toLocaleString('ko-KR'):'';
+  if(!needSlot&&(!keepManual||!cur))$('fPplCost').value=amt!=null?Number(amt).toLocaleString('ko-KR'):'';
   const billTxt=[0,1,2][p.bill_offset||0]!=null?({0:'방송 당월',1:'익월',2:'익익월'})[p.bill_offset||0]:'방송 당월';
-  const base = amt==null
+  const base = needSlot
+    ? `<span style="color:var(--blocked);font-weight:600">본방+재방 패키지입니다 — <b>본방</b>인지 <b>재방</b>인지 골라주세요 (본방 ${Math.round((p.main_ratio??0.8)*100)}% · 재방 ${Math.round((p.rerun_ratio??0.2)*100)}%)</span>`
+    : amt==null
     ? `<span style="color:var(--gold)">이 프로그램은 회당 비용이 등록돼 있지 않습니다 — PPL 프로그램 탭에서 등록하면 자동 반영됩니다</span>`
     : (kind==='패키지'
         ? `본방+재방 패키지 · 회당 ${won(p.unit_cost)}원 → <b>${esc(slot)} ${won(amt)}원</b> (본방 ${Math.round((p.main_ratio??0.8)*100)}% · 재방 ${Math.round((p.rerun_ratio??0.2)*100)}%) · 계산서 ${billTxt} · ${esc(p.tax_type||'과세')}`
@@ -5642,6 +5693,7 @@ function pplApply(keepManual){
 $('fPplYn').onchange=()=>{const on=$('fPplYn').value==='유';pplToggle(on);if(on)loadPplOptions();};
 $('fPplSel')&&($('fPplSel').onchange=()=>pplApply(false));
 $('fPplSlot')&&($('fPplSlot').onchange=()=>pplApply(false));
+$('fPplPair')&&($('fPplPair').onchange=()=>{if(typeof updateSaveGate==='function')updateSaveGate();});
 let PICKERS=false;
 let PICKP=[],PICK_CORENAME={},PRESETS=[],BRAND_LINES_USED={};
 async function loadPresets(){const {data}=await sb.from('hs_set_preset').select('*').eq('active',true).order('tier_order');PRESETS=data||[];
@@ -6244,7 +6296,8 @@ async function showBcForm(push){const s=BC;
    $('fPpl').value=s.ppl_note||'';
    $('fPplCost').value=s.ppl_cost!=null?Number(s.ppl_cost).toLocaleString('ko-KR'):'';
    $('fPplYn').value=hasPpl?'유':'무';
-   if($('fPplSlot'))$('fPplSlot').value=s.ppl_slot||'본방';
+   if($('fPplSlot'))$('fPplSlot').value=s.ppl_slot||'';
+   if($('fPplPair')){$('fPplPair').innerHTML='<option value="">— 짝 재방 방송 선택 —</option>';$('fPplPair').value=s.ppl_pair_id||'';}
    pplToggle(hasPpl);
    if(hasPpl)loadPplOptions().then(()=>{const sel=$('fPplSel');if(!sel)return;
      if(s.ppl_id)sel.value=s.ppl_id;
@@ -6554,7 +6607,7 @@ async function clRender(){const id=CL_ID;if(!id)return;await ensureChannels();
   v.querySelectorAll('#clTbl th,#clTbl td').forEach(c=>{c.style.padding='6px 8px';c.style.borderBottom='1px solid #eee';if(c.tagName==='TH')c.style.textAlign='center';});}
 function syncBcChart(){const labels=TICKS.map(t=>hhmm(new Date(t.tick_at))),sales=tickCums(),calls=TICKS.map(t=>+t.calls||0);
   if(bcChart)bcChart.destroy();
-  bcChart=new Chart($('bcChart'),{data:{labels,datasets:[{type:'line',label:'누적매출',data:sales,yAxisID:'y',borderColor:'#0D9488',backgroundColor:'rgba(13,148,136,.1)',tension:.25,fill:true},{type:'line',label:'콜',data:calls,yAxisID:'y1',borderColor:'#E5484D',tension:.25}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Pretendard'}}}},scales:{y:{position:'left',ticks:{callback:v=>baekman(v)+'백만'}},y1:{position:'right',grid:{drawOnChartArea:false}}}}});}
+  bcChart=new Chart($('bcChart'),{data:{labels,datasets:[{type:'line',label:'누적매출',data:sales,yAxisID:'y',borderColor:'#0D9488',backgroundColor:'rgba(13,148,136,.1)',tension:.25,fill:true},{type:'line',label:'콜',data:calls,yAxisID:'y1',borderColor:'#E5484D',tension:.25}]},options:{responsive:true,maintainAspectRatio:false,datasets:{bar:{maxBarThickness:52}},plugins:{legend:{labels:{font:{family:'Pretendard'}}}},scales:{y:{position:'left',ticks:{callback:v=>baekman(v)+'백만'}},y1:{position:'right',grid:{drawOnChartArea:false}}}}});}
 // ===== 필수값 검증 (비필수: 프로그램/차수·쇼호스트·PD·MD·사후미팅메모) =====
 // 저장 최소 필수 — 이것만 있으면 저장 가능(나머지는 방송 전 채우면 됨)
 const BC_HARD=[['fChannel','홈쇼핑사'],['fProduct','방송이름'],['fAir','방송 시작'],['fTax','세금']];
@@ -6589,10 +6642,21 @@ async function saveSchedule(silent){
   const comp=$('fComp').value.trim().split('\n').filter(Boolean).map(l=>{const p=l.split(' - ');return{channel:(p[0]||'').trim(),product:(p[1]||'').trim(),program:''};});
   const {startIso:airIso,endIso}=bcTimes();const feeType=getFeeSeg();const dealType=getDealSeg();
   if(!airIso){toast('방송 시작시각을 입력하세요','err');return false;}
+  /* 패키지 PPL 은 «본방/재방»을 반드시 골라야 한다 (2026-09-03 대표 설계).
+     안 고르면 예전엔 조용히 '본방'이 됐고, 그 결과 21건이 구분 없이 남아
+     재방분 20% 가 어디에도 안 잡혔다. 짐작을 저장하지 않는다. */
+  if($('fPplYn')&&$('fPplYn').value==='유'){
+    const sel=$('fPplSel'),pp=sel&&PPL_OPTS.find(x=>x.id===sel.value);
+    if(pp&&pplKind(pp)==='패키지'&&!($('fPplSlot')&&$('fPplSlot').value)){
+      toast('본방+재방 패키지입니다 — 본방인지 재방인지 골라주세요','err');
+      const el=$('fPplSlot');if(el){try{el.focus();el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_){}}
+      return false;
+    }
+  }
   const miss=bcMissingHard();
   if(miss.length){toast('저장 최소 필수: '+miss.join(', '),'err');updateSaveGate();return false;}
   const dur=(airIso&&endIso)?Math.max(0,Math.round((new Date(endIso)-new Date(airIso))/60000)):null;
-  const row={channel_id:$('fChannel').value,brand_id:($('fBrand')&&$('fBrand').value)||null,line:($('fLineTop')&&$('fLineTop').value)||null,product_name:$('fProduct').value||'새 방송',air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:feeType==='정액'?(num('fFixed')||null):null,commission_rate:(feeType==='정률'||dealType==='대행')?(+$('fRate').value/100||null):null,agency_fee_rate:(dealType==='대행')?(+$('fAgency').value/100||null):null,target_sales:num('fTarget')||0,net_target:num('fNet')||null,conv_rate:$('fConv').value?(+$('fConv').value/100):null,tax_type:$('fTax').value,program_name:$('fProg').value,ppl_note:($('fPplYn').value==='유'?($('fPpl').value||null):null),ppl_cost:($('fPplYn').value==='유'?(num('fPplCost')||null):null),ppl_id:($('fPplYn').value==='유'?(($('fPplSel')&&$('fPplSel').value)||null):null),ppl_slot:($('fPplYn').value==='유'?(($('fPplSlot')&&$('fPplSlot').value)||'본방'):null),cost_rate:(+$('fCost').value||27)/100,backmargin_rate:(+$('fBack').value||12)/100,competitors:comp,postmeeting:$('fPost').value,show_host:$('fHost').value||null,pd:$('fPd').value||null,md:$('fMd').value||null,color:$('fColor').value||null,updated_by:$('who').textContent};
+  const row={channel_id:$('fChannel').value,brand_id:($('fBrand')&&$('fBrand').value)||null,line:($('fLineTop')&&$('fLineTop').value)||null,product_name:$('fProduct').value||'새 방송',air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:feeType==='정액'?(num('fFixed')||null):null,commission_rate:(feeType==='정률'||dealType==='대행')?(+$('fRate').value/100||null):null,agency_fee_rate:(dealType==='대행')?(+$('fAgency').value/100||null):null,target_sales:num('fTarget')||0,net_target:num('fNet')||null,conv_rate:$('fConv').value?(+$('fConv').value/100):null,tax_type:$('fTax').value,program_name:$('fProg').value,ppl_note:($('fPplYn').value==='유'?($('fPpl').value||null):null),ppl_cost:($('fPplYn').value==='유'?(num('fPplCost')||null):null),ppl_id:($('fPplYn').value==='유'?(($('fPplSel')&&$('fPplSel').value)||null):null),ppl_slot:($('fPplYn').value==='유'?(($('fPplSlot')&&$('fPplSlot').value)||null):null),ppl_pair_id:($('fPplYn').value==='유'?(($('fPplPair')&&$('fPplPair').value)||null):null),cost_rate:(+$('fCost').value||27)/100,backmargin_rate:(+$('fBack').value||12)/100,competitors:comp,postmeeting:$('fPost').value,show_host:$('fHost').value||null,pd:$('fPd').value||null,md:$('fMd').value||null,color:$('fColor').value||null,updated_by:$('who').textContent};
   const wasNew=!!BC.__new;let err=null;
   if(wasNew){const st=(dealType==='대행')?'예정':'작성중';   // 자사는 구성 저장까지 마쳐야 '예정'으로 확정
     const {data,error}=await sb.from('hs_schedules').insert({...row,status:st,tenant_id:BC.tenant_id||null}).select().single();
@@ -6624,6 +6688,34 @@ async function saveSchedule(silent){
       return false;
     }
     if(!error&&up&&up.length)BC.__ver=up[0].updated_at;
+  }
+
+  /* ── 짝 재방 방송에 재방분(20%)을 «같이» 넣는다 (2026-09-03 대표 설계) ──────
+     패키지 한 회차는 본방 노출 + 재방 노출이 같이 온다. 본방 방송에 80% 만 넣고
+     재방 방송을 비워 두면 20% 가 어디에도 안 잡히고 사라진다.
+     그래서 본방을 저장할 때 짝 방송에도 같은 PPL·재방 구분·재방 금액을 써 준다.
+     짝을 «풀면» 그 방송의 PPL 도 지운다 — 안 그러면 유령 비용이 남는다. */
+  if(!err&&!wasNew&&row.ppl_id&&row.ppl_slot==='본방'){
+    try{
+      const pp=PPL_OPTS.find(x=>x.id===row.ppl_id);
+      const newPair=row.ppl_pair_id||null;
+      const oldPair=(BC&&BC.ppl_pair_id)||null;
+      if(pp&&pplKind(pp)==='패키지'){
+        if(oldPair&&oldPair!==newPair)
+          await sb.from('hs_schedules')
+            .update({ppl_id:null,ppl_slot:null,ppl_cost:null,ppl_note:null,updated_by:$('who').textContent})
+            .eq('id',oldPair).eq('ppl_slot','재방');   // 재방으로 잡힌 것만 푼다
+        if(newPair){
+          const rerun=pplAmount(pp,'재방');
+          const {error:pe}=await sb.from('hs_schedules').update({
+            ppl_id:row.ppl_id, ppl_slot:'재방', ppl_cost:rerun,
+            ppl_note:pp.broadcaster+' '+pp.program, updated_by:$('who').textContent
+          }).eq('id',newPair);
+          if(!pe)toast(`짝 재방 방송에 재방분 ${won(rerun)}원을 넣었습니다`,'ok');
+          else toast('짝 재방 방송에 반영하지 못했습니다 — '+dbMsg(pe),'err');
+        }
+      }
+    }catch(_){}
   }
 
   /* ── 전환율을 고치면 실적 쪽도 «따라 맞춘다» (2026-09-03) ────────────────
@@ -6670,7 +6762,7 @@ async function saveSchedule(silent){
     }
   }
 
-  Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_id:row.ppl_id,cost_rate:row.cost_rate,backmargin_rate:row.backmargin_rate,agency_fee_rate:row.agency_fee_rate,program_name:row.program_name,show_host:row.show_host,pd:row.pd,md:row.md,color:row.color});
+  Object.assign(BC,{channel_id:row.channel_id,brand_id:row.brand_id,line:row.line,product_name:row.product_name,air_at:airIso,air_end:endIso,duration_min:dur,fee_type:feeType,deal_type:dealType,fee_amount:row.fee_amount,commission_rate:row.commission_rate,target_sales:row.target_sales,net_target:row.net_target,conv_rate:row.conv_rate,competitors:comp,postmeeting:row.postmeeting,program_name:row.program_name,tax_type:row.tax_type,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_id:row.ppl_id,ppl_slot:row.ppl_slot,ppl_pair_id:row.ppl_pair_id,cost_rate:row.cost_rate,backmargin_rate:row.backmargin_rate,agency_fee_rate:row.agency_fee_rate,program_name:row.program_name,show_host:row.show_host,pd:row.pd,md:row.md,color:row.color});
   {const d2=new Date(airIso),e2=endIso?new Date(endIso):null;$('bcTitle').textContent=`${BCH[BC.channel_id]||''} ${BC.product_name||''}`;$('bcSub').textContent=`${d2.getFullYear()}.${d2.getMonth()+1}.${d2.getDate()}(${DOW[d2.getDay()]}) ${hhmm(d2)}${e2?'~'+hhmm(e2):''} · ${feeType==='정액'?('정액 '+baekman(BC.fee_amount)+'백만'):('정률 '+Math.round((BC.commission_rate||0)*100)+'%')}`;}
   applyLock();applyDraftGate();
   if(wasNew){try{history.replaceState({v:'bcdetail',id:BC.id},'');}catch(_){}}
@@ -6679,7 +6771,7 @@ async function saveSchedule(silent){
        고친 값이 덮어써졌을 때 로그만으로 되돌릴 수 있어야 한다. */
     reason:'잠금 해제 후 수정',changes:{target_sales:row.target_sales,net_target:row.net_target,fee_type:feeType,
       fee_amount:row.fee_amount,commission_rate:row.commission_rate,air_at:airIso,conv_rate:row.conv_rate,
-      ppl_id:row.ppl_id,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_slot:row.ppl_slot,
+      ppl_id:row.ppl_id,ppl_note:row.ppl_note,ppl_cost:row.ppl_cost,ppl_slot:row.ppl_slot,ppl_pair_id:row.ppl_pair_id,
       cost_rate:row.cost_rate,backmargin_rate:row.backmargin_rate,
       channel_id:row.channel_id,tax_type:row.tax_type},
     actor_id:(ME&&ME.user_id)||null,actor_name:(ME&&ME.name)||$('who').textContent});}catch(_){}}
@@ -8189,7 +8281,50 @@ function upSub(v){
   if(a)a.classList.toggle('hidden',v!=='agency');
   if(v==='self'&&typeof suStatus==='function'){try{suStatus();}catch(_){}}
 }
+/* 월별 적재 격자 — 「없는 것」을 보여준다.
+   ▲ 는 «자사 방송은 했는데 그 달 정산이 한 행도 없는» 칸이다.
+   대행은 정산서가 대행사로 가므로 애초에 세지 않는다 — 안 그러면 대행이 전부 ▲ 로 떠서
+   진짜 빠진 것이 묻힌다. (뷰 hs_v_settle_grid 에서 deal_type='자사' 로 좁혀 둔다) */
+async function loadGrid(){
+  const box=$('gridBox'); if(!box) return;
+  const nMon=+(($('gridMonths')||{}).value||12);
+  const onlyOdd=!!(($('gridOnlyOdd')||{}).checked);
+  const {data,error}=await sb.from('hs_v_settle_grid')
+    .select('channel_id,channel_name,channel_type,sort_no,ym,bc_n,rows_n,gross,state');
+  if(error){box.innerHTML='<div class="muted" style="font-size:11.5px">격자를 못 읽었습니다</div>';return;}
+  const rows=data||[];
+  const yms=[...new Set(rows.map(r=>r.ym))].sort().slice(-nMon);
+  const keep=new Set(yms);
+  const byCh={};
+  rows.forEach(r=>{ if(!keep.has(r.ym))return;
+    (byCh[r.channel_id]=byCh[r.channel_id]||{n:r.channel_name,s:r.sort_no,t:r.channel_type,m:{}}).m[r.ym]=r; });
+  let chs=Object.values(byCh)
+    .filter(c=>yms.some(y=>c.m[y]&&(c.m[y].bc_n>0||c.m[y].rows_n>0)))   // 그 기간에 아무것도 없는 홈사는 빼다
+    .sort((a,b)=>(a.s??999)-(b.s??999)||String(a.n).localeCompare(b.n));
+  if(onlyOdd)chs=chs.filter(c=>yms.some(y=>c.m[y]&&c.m[y].state==='missing'));
+  if(!chs.length){box.innerHTML='<div class="muted" style="font-size:11.5px">'+(onlyOdd?'빠진 달이 없습니다 ✅':'표시할 홈사가 없습니다')+'</div>';return;}
+  const cell=r=>{
+    if(!r)return '<span class="muted">·</span>';
+    if(r.state==='ok')return `<b style="color:var(--brand-ink)" title="${r.rows_n}행">●</b>`;
+    if(r.state==='missing')return `<b style="color:var(--blocked)" title="자사 방송 ${r.bc_n}건인데 정산 0행">▲</b>`;
+    return '<span class="muted">·</span>';
+  };
+  const miss=c=>yms.filter(y=>c.m[y]&&c.m[y].state==='missing').length;
+  box.innerHTML='<table style="width:100%;font-size:11.5px;border-collapse:collapse">'
+   +'<thead><tr><th class="l" style="text-align:left;padding:5px 6px;white-space:nowrap">홈사</th>'
+   + yms.map(y=>`<th style="padding:5px 3px;font-weight:600;white-space:nowrap">${+y.slice(5)}월</th>`).join('')
+   +'<th style="padding:5px 6px;white-space:nowrap">빠진 달</th></tr></thead><tbody>'
+   + chs.map(c=>`<tr><td style="padding:5px 6px;white-space:nowrap;border-top:1px solid var(--line1)">${esc(c.n)}`
+       +`<span class="muted" style="font-size:10px;margin-left:4px">${esc(c.t||'')}</span></td>`
+       + yms.map(y=>`<td style="text-align:center;padding:5px 3px;border-top:1px solid var(--line1)">${cell(c.m[y])}</td>`).join('')
+       + `<td style="text-align:center;padding:5px 6px;border-top:1px solid var(--line1)">`
+       + (miss(c)?`<b style="color:var(--blocked)">${miss(c)}</b>`:'0')+'</td></tr>').join('')
+   +'</tbody></table>';
+}
+$('gridMonths')&&($('gridMonths').onchange=loadGrid);
+$('gridOnlyOdd')&&($('gridOnlyOdd').onchange=loadGrid);
 function loadUpload(){
+  loadGrid();
   const su=$('settleUpload'),ag=$('agUpload'),sh=$('upSelfHost'),ah=$('upAgencyHost');
   if(su&&sh&&su.parentElement!==sh){sh.appendChild(su);su.classList.remove('hidden');}
   if(ag&&ah&&ag.parentElement!==ah){ah.appendChild(ag);ag.classList.remove('hidden');}

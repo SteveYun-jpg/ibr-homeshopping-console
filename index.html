@@ -728,18 +728,21 @@ body.acker-max main{padding-right:30px}
         <!-- 그래프 — 홈 대시보드와 같은 뼈대(카드 → 그래프 → 로우데이터).
              김태완 대표 의견(2026-08-14). 방송결과·영업·회계 세 탭에서만 보인다.
              부가세·검수·업로드는 성격이 달라 그대로 뒀다. -->
+        <!-- 그리드 칸에 min-width:0 이 필요하다. 기본값 auto 는 «내용보다 작아지지 않는다» 라
+             막대 그래프처럼 x축 라벨이 여럿인 차트가 칸 밖으로 삐져나간다.
+             도넛은 정사각형이라 높이에 맞춰 줄어들어 티가 안 났다. (2026-09-02) -->
         <div id="settleCharts" class="hidden" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px">
-          <div class="card" style="padding:12px 14px">
+          <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
             <b style="font-size:12px;display:block;margin-bottom:8px">월별 판매매출 · 잠정손익 <span class="muted" style="font-weight:400">(억원)</span></b>
-            <div style="height:190px"><canvas id="stChMonth"></canvas></div>
+            <div style="height:190px;min-width:0"><canvas id="stChMonth"></canvas></div>
           </div>
-          <div class="card" style="padding:12px 14px">
+          <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
             <b style="font-size:12px;display:block;margin-bottom:8px">브랜드별</b>
-            <div style="height:190px"><canvas id="stChBrand"></canvas></div>
+            <div style="height:190px;min-width:0"><canvas id="stChBrand"></canvas></div>
           </div>
-          <div class="card" style="padding:12px 14px">
+          <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
             <b style="font-size:12px;display:block;margin-bottom:8px">홈사별</b>
-            <div style="height:190px"><canvas id="stChCh"></canvas></div>
+            <div style="height:190px;min-width:0"><canvas id="stChCh"></canvas></div>
           </div>
         </div>
         <!-- 자사 정산서 업로드 -->
@@ -790,18 +793,19 @@ body.acker-max main{padding-right:30px}
           </div>
           <div class="scroll" id="agPnlSummary" style="margin-bottom:14px"></div>
           <!-- 자사 결산과 같은 뼈대. 다만 우리 몫은 수수료라 막대(대행매출) 위에 선(우리수익)을 겹친다. -->
+          <!-- 자사 결산과 같은 구조다. 같이 고친다 (min-width:0 — 위 주석 참고) -->
           <div id="agCharts" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px">
-            <div class="card" style="padding:12px 14px">
+            <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
               <b style="font-size:12px;display:block;margin-bottom:8px">월별 대행매출 · 우리 수익 <span class="muted" style="font-weight:400">(억원)</span></b>
-              <div style="height:190px"><canvas id="agChMonth"></canvas></div>
+              <div style="height:190px;min-width:0"><canvas id="agChMonth"></canvas></div>
             </div>
-            <div class="card" style="padding:12px 14px">
+            <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
               <b style="font-size:12px;display:block;margin-bottom:8px">대행사별 우리 수익</b>
-              <div style="height:190px"><canvas id="agChAgency"></canvas></div>
+              <div style="height:190px;min-width:0"><canvas id="agChAgency"></canvas></div>
             </div>
-            <div class="card" style="padding:12px 14px">
+            <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden">
               <b style="font-size:12px;display:block;margin-bottom:8px">홈사별 대행매출</b>
-              <div style="height:190px"><canvas id="agChCh"></canvas></div>
+              <div style="height:190px;min-width:0"><canvas id="agChCh"></canvas></div>
             </div>
           </div>
           <div class="card scroll" style="padding:0"><table id="t_agPnl"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
@@ -2166,7 +2170,7 @@ const eokN=v=>Math.round((+v||0)/1e8*10)/10;   // 억 단위
 async function loadDashPnl(keepSet){
   const el=$('dashPnlCombine');if(!el)return;
   const {data}=await sb.from('hs_v_settle_flash').select('air_at,deal_type,잠정손익');
-  const rows=(data||[]).filter(r=>keepSet.has((r.air_at||'').slice(0,7)));
+  const rows=(data||[]).filter(r=>keepSet.has(ymKST(r.air_at)));   // KST 기준 월
   const ja=rows.filter(r=>r.deal_type==='자사').reduce((a,r)=>a+(+r.잠정손익||0),0);
   const dh=rows.filter(r=>r.deal_type==='대행').reduce((a,r)=>a+(+r.잠정손익||0),0);
   const tot=ja+dh, jn=rows.filter(r=>r.deal_type==='자사').length, dn=rows.filter(r=>r.deal_type==='대행').length;
@@ -2204,7 +2208,7 @@ async function loadHome(){
       const f=await fetchAll(()=>sb.from('hs_v_settle_flash')
         .select('air_at,channel_name,channel_type,brand_name,product_name,deal_type,판매수량,판매매출,전환매출,원가,잠정손익,원가미매칭행'));
       rows=(f||[]).filter(r=>r.air_at).map(r=>({
-        ym:(r.air_at||'').slice(0,7), channel_name:r.channel_name, channel_type:r.channel_type,
+        ym:ymKST(r.air_at), channel_name:r.channel_name, channel_type:r.channel_type,
         sales_channel:'(방송)', brand_name:r.brand_name, product_name:r.product_name,
         deal_type:r.deal_type, qty:+r.판매수량||0,
         방송:+r.판매매출||0, 영업:+r.판매매출||0, 회계마감:+r.전환매출||0,
@@ -2490,7 +2494,17 @@ const ymNext=(ym)=>{const [y,m]=String(ym||'').split('-').map(Number);
 const kstYmStart=(ym)=>{const t=String(ym||'').match(/^(\d{4})-(\d{2})$/);
   if(!t)return null;
   return new Date(`${ym}-01T00:00:00+09:00`).toISOString();};
-const mrHit=(r,v)=>{const k=(r||'').slice(0,7);if(!k)return false;
+/* 시각 → 「YYYY-MM」 «한국시각 기준». 월을 가르는 자리는 전부 이것만 쓴다.
+   전에는 곳곳에서 `air_at.slice(0,7)` 로 잘랐는데 그건 UTC 월이다.
+   KST 새벽 방송(00:00~08:59)이 옆 달로 넘어가, 그래프 막대와 KPI 가 표와 어긋났다.
+   뷰(hs_v_settle_flash)는 이미 AT TIME ZONE 'Asia/Seoul' 로 날짜를 만든다 — 거기에 맞춘다.
+   이미 「YYYY-MM」 인 값이 들어오면 그대로 돌려준다(기간 필터가 그렇게 부른다). */
+const ymKST=(v)=>{const s=String(v||'');
+  if(/^\d{4}-\d{2}$/.test(s))return s;
+  const d=new Date(s);
+  if(isNaN(d.getTime()))return s.slice(0,7);
+  return new Date(d.getTime()+9*3600e3).toISOString().slice(0,7);};
+const mrHit=(r,v)=>{const k=ymKST(r);if(!k)return false;
   if(v.from&&k<v.from)return false;if(v.to&&k>v.to)return false;return true;};
 
 // ===== SETTLE =====
@@ -2532,7 +2546,7 @@ async function stCharts(){
     .select('air_at,channel_name,brand_name,판매매출,잠정손익')
     .eq('deal_type','자사').gte('air_at',kstYmStart(from)||'1900-01-01').lt('air_at',kstYmStart(ymNext(to))||'2999-01-01');
   const rows=data||[];
-  const M={};rows.forEach(r=>{const k=(r.air_at||'').slice(0,7);if(!k)return;
+  const M={};rows.forEach(r=>{const k=ymKST(r.air_at);if(!k)return;   // 막대의 월도 KST 기준
     (M[k]=M[k]||{s:0,p:0}).s+=(+r.판매매출||0);M[k].p+=(+r.잠정손익||0);});
   const ks=Object.keys(M).sort();
   // 여러 해가 걸치면 「1월」로는 어느 해인지 모른다 → 「26.1」
@@ -4473,7 +4487,7 @@ async function agCharts(){
     .select('air_at,channel_name,brand_name,판매매출,잠정손익,대행수수료율')
     .eq('deal_type','대행').gte('air_at',kstYmStart(from)||'1900-01-01').lt('air_at',kstYmStart(ymNext(to))||'2999-01-01');
   const rows=data||[];
-  const M={};rows.forEach(r=>{const k=(r.air_at||'').slice(0,7);if(!k)return;
+  const M={};rows.forEach(r=>{const k=ymKST(r.air_at);if(!k)return;   // 막대의 월도 KST 기준
     (M[k]=M[k]||{s:0,p:0}).s+=(+r.판매매출||0);M[k].p+=(+r.잠정손익||0);});
   const ks=Object.keys(M).sort();
   // 여러 해가 걸치면 「1월」로는 어느 해인지 모른다 → 「26.1」

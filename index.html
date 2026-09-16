@@ -548,6 +548,7 @@ body.acker-max main{padding-right:30px}
     <div class="navgroup">
       <div class="gl">분석 · 재고</div>
       <div class="nav" data-v="sim" data-t="방송 시뮬레이션"><span class="icx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17v-5"/><path d="M13 17V7"/><path d="M18 17v-8"/></svg></span><span class="lb">시뮬레이션</span></div>
+      <div class="nav" data-v="invest" data-t="투자보고 손익"><span class="icx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg></span><span class="lb">투자보고 손익</span></div>
     </div>
     <div class="navgroup">
       <div class="gl">업무</div>
@@ -776,6 +777,8 @@ body.acker-max main{padding-right:30px}
           <div class="toolbar seg" id="settleSeg" style="max-width:820px;margin:0"><button class="on" data-v="flash">방송결과기준</button><button data-v="monthly">영업기준(방송월)</button><button data-v="vat">회계마감기준(계산서월)</button><button data-v="vatrep">부가세신고 양식</button><button data-v="audit">🔍 월별 검수</button></div>
           <label style="margin:0;color:var(--ink3);font-size:12px">기간</label>
           <div class="mr" id="mr-settle"></div>
+          <!-- 개발요청 234b1434 (황선유 대리 2026-08-27) — 필터 걸어 합계·평균을 내려면 엑셀이 필요하다 -->
+          <button class="btn sm" id="stXlsx" title="지금 기간의 방송결과를 엑셀로 내려받기 (화면의 300건 제한 없이 전부)">⤓ 엑셀</button>
         </div>
         <div class="scroll" id="settleSummary" style="margin-bottom:14px"></div>
         <!-- 그래프 — 홈 대시보드와 같은 뼈대(카드 → 그래프 → 로우데이터).
@@ -833,6 +836,38 @@ body.acker-max main{padding-right:30px}
         <div class="card scroll" id="settleTblBox" style="padding:0"><table id="t_settle"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
       </div>
 
+      <!-- 투자보고 손익 — 외부(투자사·심사)에 내보내는 숫자.
+           원가가 없는 행을 «이익 0»으로도 «없는 셈»으로도 처리하지 않는다.
+           분자·분모 어디에도 넣지 않고, 얼마가 빠졌는지 화면에 같이 띄운다. -->
+      <div class="view" id="v-invest">
+        <div class="sechead"><h2 class="sec">투자보고 손익</h2><span class="tag">회계마감 기준</span></div>
+        <p class="hint">투자사·심사에 내보내는 손익입니다. 이익률은 <b>원가가 확보된 매출만</b>을 분모로 계산합니다 — 원가가 없는 행은 분자에도 분모에도 넣지 않고 <b>원가 미확보</b>로 따로 보여줍니다. 그래서 여기 이익률은 «확보된 범위 안에서의» 이익률이고, <b>미확보 비중이 큰 달은 그 달을 대표하지 않습니다</b>. 원 자료는 <code>hs_v_gross_profit</code>(부가세 포함 매출 기준)입니다.</p>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <div class="toolbar seg" id="invSeg" style="max-width:560px;margin:0"><button class="on" data-v="month">월별 손익</button><button data-v="period">기간 요약 (투자보고용)</button></div>
+          <label style="margin:0;color:var(--ink3);font-size:12px">기간</label>
+          <div class="mr" id="mr-invest"></div>
+          <div class="spacer"></div>
+          <button class="btn sm" id="invCsv">⤓ CSV</button>
+        </div>
+        <div class="sh-kpis" id="invKpis"></div>
+        <div id="invWarn" style="margin:10px 0"></div>
+        <div id="invMonth">
+          <div class="card" style="padding:12px 14px;min-width:0;overflow:hidden;margin-bottom:12px">
+            <b style="font-size:12px;display:block;margin-bottom:8px">월별 매출원가·매출이익 <span class="muted" style="font-weight:400">(억원)</span></b>
+            <div style="height:210px;min-width:0"><canvas id="invChart"></canvas></div>
+          </div>
+          <div class="card scroll" style="padding:0"><table id="t_invest"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+        </div>
+        <div id="invPeriod" class="hidden">
+          <div class="card" style="padding:16px 18px;margin-bottom:12px">
+            <b style="font-size:13px;display:block;margin-bottom:4px">기간 요약</b>
+            <p class="hint" style="margin:0 0 12px">위 <b>기간</b>에서 고른 구간의 합계입니다. 그대로 옮겨 쓰실 수 있게 한 줄로 정리했습니다.</p>
+            <div id="invPeriodBox"></div>
+          </div>
+          <div class="card scroll" style="padding:0"><table id="t_investMiss"><tbody><tr><td class="state">로그인 후 표시</td></tr></tbody></table></div>
+        </div>
+      </div>
+
       <!-- 대행 결산 -->
       <div class="view" id="v-agency">
         <div class="sechead"><h2 class="sec">대행 결산</h2><span class="tag">위탁사 대행 수수료</span></div>
@@ -845,6 +880,7 @@ body.acker-max main{padding-right:30px}
           <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <label style="margin:0;color:var(--ink3);font-size:12px">기간</label>
             <div class="mr" id="mr-agpnl"></div>
+            <button class="btn sm" id="agXlsx" title="지금 기간의 대행 방송결과를 엑셀로 내려받기">⤓ 엑셀</button>
           </div>
           <div class="scroll" id="agPnlSummary" style="margin-bottom:14px"></div>
           <!-- 자사 결산과 같은 뼈대. 다만 우리 몫은 수수료라 막대(대행매출) 위에 선(우리수익)을 겹친다. -->
@@ -1550,6 +1586,37 @@ const CHANNELS=[['5787e453-af19-4320-a0e3-55bf1f1824eb','롯데홈쇼핑'],['71e
 const BRANDS=[['44444444-0000-0000-0000-000000000001','아티키'],['f1665052-1df6-4282-9900-3ea104326fd9','메리비'],['44444444-0000-0000-0000-000000000003','라메종드미엘'],['44444444-0000-0000-0000-000000000004','하커허벌']];   // 메리비는 통합 후 정본 id 를 쓴다 (시드 id 는 merged 처리됨)
 const chMap=Object.fromEntries(CHANNELS.map(c=>c)), brMap=Object.fromEntries(BRANDS.map(b=>b));
 function toast(m,c){const t=$('toast');t.textContent=m;t.className='toast show '+(c||'');setTimeout(()=>t.className='toast',2500);}
+/* ===== 엑셀 내려받기 — 한 벌 (개발요청 234b1434 · 황선유 대리 2026-08-27) =====
+   「필터 걸어 합계·평균을 낸다」가 목적이라 «숫자를 숫자로» 내보낸다.
+   CSV 로 내보내면 천단위 콤마 때문에 엑셀이 글자로 읽어 SUM 이 안 된다.
+   cols = [{h:'머리글', k:'키', n:true(숫자), p:true(퍼센트)}] */
+function xlsxSave(rows, cols, fname, sheetName){
+  if(!rows||!rows.length){toast('내려받을 자료가 없습니다','err');return;}
+  if(typeof XLSX==='undefined'){toast('엑셀 모듈을 못 불러왔습니다','err');return;}
+  const aoa=[cols.map(c=>c.h)];
+  rows.forEach(r=>aoa.push(cols.map(c=>{
+    const v=(typeof c.k==='function')?c.k(r):r[c.k];
+    if(v==null||v==='')return null;
+    if(c.n)return +v||0;
+    if(c.p)return (+v||0);          // 퍼센트는 0~1 로 넣고 서식으로 보여준다
+    return String(v);
+  })));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  // 숫자·퍼센트 서식 — 엑셀에서 바로 합계·평균이 되게
+  const R=aoa.length-1;
+  cols.forEach((c,ci)=>{ if(!c.n&&!c.p)return;
+    for(let ri=1;ri<=R;ri++){
+      const a=XLSX.utils.encode_cell({r:ri,c:ci}), cell=ws[a];
+      if(cell&&cell.v!=null)cell.z=c.p?'0.0%':'#,##0';
+    }});
+  ws['!cols']=cols.map(c=>({wch:c.w||(c.n?14:c.p?9:16)}));
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R,c:cols.length-1}})};
+  ws['!freeze']={xSplit:0,ySplit:1};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,(sheetName||'Sheet1').slice(0,31));
+  XLSX.writeFile(wb,fname);
+  toast(`${rows.length}행 내려받았습니다`,'ok');
+}
 /* ===== 끌어다 놓기 칸 — 한 벌만 둔다 =====
    정산서(자사·대행)와 관련컷이 같이 부른다. 같은 동작을 세 벌 쓰면 반드시 어긋난다.
 
@@ -1732,7 +1799,7 @@ function navTo(v,push){if(push===undefined)push=true;
   const view=$('v-'+v);if(view)view.classList.add('active');
   if(v==='channels'){const t=$('chTabs').querySelector(`button[data-v="${feeTab?'fee':'base'}"]`);if(t)t.click();}
   if(v==='upload')loadUpload();
-  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();if(v==='meet')loadMeet();
+  if(v==='home')loadHome();if(v==='ledger')loadLedger();if(v==='settle')loadSettle();if(v==='broadcast')loadBcCal();if(v==='sim')loadSim();if(v==='invest')loadInvest();if(v==='agency')loadAgency();if(v==='members')loadMembers();if(v==='survey')loadSurvey();if(v==='workflow')loadWorkflow();if(v==='ppl')loadPplMaster();if(v==='quest')loadQuest();if(v==='meet')loadMeet();
   if(v==='channels')loadChannels();if(v==='brands')loadBrands();if(v==='products')skuSub(subSku);if(v==='config')configSub(subCfg);
   document.body.classList.toggle('wf-full',v==='workflow');   // 워크플로우는 여백 없이 꽉 채움
   if(window.IBR_SHELL_VIEW) window.IBR_SHELL_VIEW(v);         // 워크플로우 보드·업무 정의 지연 마운트
@@ -2664,6 +2731,50 @@ async function stCharts(){
   stDonut('stChBrand', stGroup(rows,'brand_name','판매매출',6), ST_PAL);
   stDonut('stChCh',    stGroup(rows,'channel_name','판매매출'),  ST_PAL2);
 }
+/* 방송결과 엑셀 내려받기 (개발요청 234b1434) — 자사·대행이 같은 함수를 쓴다.
+   ⚠ 화면 표는 limit(300) 뒤에 자바스크립트로 기간을 거른다. 엑셀은 그 길을 타지 않는다 —
+     서버에서 기간으로 «먼저» 걸러 전부 받는다. 안 그러면 합계가 조용히 모자란다. */
+async function exportFlash(deal){
+  const RG=mrGet(deal==='대행'?'agpnl':'settle');
+  const btn=$(deal==='대행'?'agXlsx':'stXlsx');
+  if(btn){btn.disabled=true;btn.textContent='받는 중…';}
+  try{
+    const rows=await fetchAll(()=>sb.from('hs_v_settle_flash')
+      .select('air_date,air_at,channel_name,brand_name,product_name,fee_type,deal_type,'
+             +'판매매출,전환매출,전환매출_공급가,미리주문,conversion_rate,목표:target_sales,'
+             +'특약비,정률수수료,추가수수료,코드수수료,PPL비,원가,원가출처,원가율,'
+             +'잠정손익,대행사잠정손익,대행수수료율,달성율,입금예정일,판매수량,콜수,구성행수,원가미매칭행')
+      .eq('deal_type',deal).order('air_at',{ascending:false}));
+    const data=(rows||[]).filter(r=>mrHit(r.air_at,RG));
+    const isAg=(deal==='대행');
+    const cols=[
+      {h:'방송일자',k:r=>r.air_date||(r.air_at||'').slice(0,10),w:11},
+      {h:'홈사',k:'channel_name',w:14},{h:'브랜드',k:'brand_name',w:12},{h:'제품',k:'product_name',w:24},
+      {h:'정산구분',k:'fee_type',w:9},
+      {h:'목표',k:'목표',n:1},{h:'판매매출',k:'판매매출',n:1},
+      {h:'전환율',k:'conversion_rate',p:1},{h:'전환매출',k:'전환매출',n:1},
+      {h:'전환매출(공급가)',k:'전환매출_공급가',n:1,w:16},{h:'미리주문',k:'미리주문',n:1},
+      {h:'특약비',k:'특약비',n:1},{h:'정률수수료',k:'정률수수료',n:1},
+      {h:'추가수수료',k:'추가수수료',n:1},{h:'코드수수료',k:'코드수수료',n:1},
+      {h:'PPL비',k:'PPL비',n:1},
+      {h:'원가',k:'원가',n:1},{h:'원가출처',k:'원가출처',w:18},
+      {h:'원가율',k:r=>(+r.전환매출_공급가?(+r.원가/+r.전환매출_공급가):null),p:1},
+      ...(isAg?[{h:'대행수수료율',k:'대행수수료율',p:1},
+                {h:'우리수익(잠정)',k:'잠정손익',n:1,w:15},
+                {h:'대행사 잠정손익',k:'대행사잠정손익',n:1,w:15}]
+             :[{h:'잠정손익',k:'잠정손익',n:1}]),
+      {h:'달성률',k:'달성율',p:1},
+      {h:'판매수량',k:'판매수량',n:1},{h:'콜수',k:'콜수',n:1},
+      {h:'입금예정일',k:'입금예정일',w:11},
+      {h:'구성행수',k:'구성행수',n:1},{h:'원가미매칭',k:'원가미매칭행',n:1}
+    ];
+    const per=[RG.from||'전체',RG.to||''].filter(Boolean).join('~');
+    xlsxSave(data,cols,`홈쇼핑_${isAg?'대행':'자사'}_방송결과_${per||'전체'}.xlsx`,`${isAg?'대행':'자사'} 방송결과`);
+  }catch(e){toast('엑셀 만들기 실패: '+(e.message||e),'err');}
+  finally{if(btn){btn.disabled=false;btn.textContent='⤓ 엑셀';}}
+}
+$('stXlsx')&&($('stXlsx').onclick=()=>exportFlash('자사'));
+$('agXlsx')&&($('agXlsx').onclick=()=>exportFlash('대행'));
 let settleMode='flash';
 $('settleSeg').onclick=async e=>{const b=e.target.closest('button');if(!b)return;settleMode=b.dataset.v;
   [...$('settleSeg').children].forEach(x=>x.classList.toggle('on',x===b));
@@ -2674,6 +2785,132 @@ $('settleSeg').onclick=async e=>{const b=e.target.closest('button');if(!b)return
     if(data&&data[0])mrSet('settle',data[0].settle_month,data[0].settle_month,true);}
   loadSettle();};
 mrInit('settle',$('mr-settle'),()=>loadSettle());
+
+/* ===== 투자보고 손익 =====
+   바깥으로 나가는 숫자다. 여기서 이익률을 부풀리면 나중에 정정해야 한다.
+   원칙 하나: 원가가 없는 행은 «이익 0»도 «없는 셈»도 아니다.
+     - 분모(원가확보매출)에서 뺀다
+     - 분자(매출이익)에서도 뺀다
+     - 대신 얼마가 빠졌는지 항상 같이 띄운다
+   hs_v_gross_profit.원가미등록 = true 인 행이 그것이다. */
+let invMode='month', INV_ROWS=[], INV_MISS=[];
+$('invSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;invMode=b.dataset.v;
+  [...$('invSeg').children].forEach(x=>x.classList.toggle('on',x===b));
+  $('invMonth').classList.toggle('hidden',invMode!=='month');
+  $('invPeriod').classList.toggle('hidden',invMode!=='period');
+  invRender();};
+mrInit('invest',$('mr-invest'),()=>loadInvest());
+
+async function loadInvest(){
+  if(!AUTHED){tbl('t_invest',[{h:'',l:1,f:()=>''}],null,'로그인 후 조회');$('invKpis').innerHTML='';return;}
+  const RG=mrGet('invest');
+  let rows;
+  try{
+    rows=await fetchAll(()=>{let q=sb.from('hs_v_gross_profit').select('*');
+      if(RG.from)q=q.gte('ym',RG.from); if(RG.to)q=q.lte('ym',RG.to); return q;});
+  }catch(e){
+    toast('투자보고 손익 조회 실패: '+(e.message||e),'err');
+    $('invKpis').innerHTML='';tbl('t_invest',[{h:'',l:1,f:()=>''}],null,'조회 실패');return;}
+  // 월별 집계 — 미확보분을 매출·이익 양쪽에서 분리한다
+  const M={};
+  rows.forEach(r=>{const k=r.ym;if(!k)return;
+    const m=M[k]=M[k]||{ym:k,총매출:0,미확보:0,미확보건:0,원가:0};
+    const rev=+r['매출']||0;
+    m.총매출+=rev;
+    if(r['원가미등록']){m.미확보+=rev;m.미확보건++;}
+    else m.원가+=(+r['매출원가']||0);});
+  INV_ROWS=Object.values(M).sort((a,b)=>a.ym<b.ym?-1:1).map(m=>{
+    const 확보=m.총매출-m.미확보, 이익=확보-m.원가;
+    return {...m,확보,이익,률:확보?100*이익/확보:null,미확보율:m.총매출?100*m.미확보/m.총매출:0};});
+  INV_MISS=rows.filter(r=>r['원가미등록'])
+    .map(r=>({ym:r.ym,브랜드:r['브랜드']||'(미분류)',품목:r['표준품목']||'',홈사:r['홈사']||'',
+              수량:+r['수량']||0,매출:+r['매출']||0}))
+    .sort((a,b)=>b.매출-a.매출);
+  invRender();
+}
+
+function invRender(){
+  const R=INV_ROWS;
+  const T=R.reduce((a,m)=>({총매출:a.총매출+m.총매출,미확보:a.미확보+m.미확보,원가:a.원가+m.원가,
+                            확보:a.확보+m.확보,이익:a.이익+m.이익,건:a.건+m.미확보건}),
+                   {총매출:0,미확보:0,원가:0,확보:0,이익:0,건:0});
+  const 률=T.확보?100*T.이익/T.확보:0, 미율=T.총매출?100*T.미확보/T.총매출:0;
+  const kpi=(l,v,s,c)=>`<div class="sh-kpi ${c||''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||''}</div></div>`;
+  $('invKpis').innerHTML =
+     kpi('총매출', won(T.총매출)+'원', `${R.length}개월`, 'brand')
+    +kpi('매출원가', won(T.원가)+'원', '원가 확보분에 대한 값')
+    +kpi('매출이익', won(T.이익)+'원', '원가 확보 매출 − 매출원가')
+    +kpi('이익률', 률.toFixed(1)+'%', '분모 = 원가 확보 매출')
+    +kpi('원가 미확보', won(T.미확보)+'원', `${T.건}건 · 총매출의 ${미율.toFixed(2)}%`, 미율>1?'':'');
+  // 미확보 비중이 큰 달은 «그 달 이익률을 쓰면 안 된다»고 화면이 먼저 말해야 한다
+  const bad=R.filter(m=>m.미확보율>=10);
+  $('invWarn').innerHTML = bad.length
+    ? `<div class="card" style="padding:12px 14px;border-color:var(--gold);background:var(--gold-bg)">
+         <b style="font-size:12px">이 달들은 이익률을 그대로 쓰지 마십시오 — 원가 미확보가 10%를 넘습니다</b>
+         <div style="margin-top:6px;font-size:12px;color:var(--ink2);line-height:1.7">${
+           bad.map(m=>`· <b>${m.ym}</b> — 총매출 ${eok(m.총매출)} 중 <b>${eok(m.미확보)}</b>가 미확보 (${m.미확보율.toFixed(0)}%). 표기 이익률 ${m.률==null?'–':m.률.toFixed(1)+'%'}는 나머지 ${eok(m.확보)}에 대한 값입니다.`).join('<br>')}</div></div>`
+    : (T.미확보>0
+        ? `<div class="hint" style="margin:0">원가 미확보 ${won(T.미확보)}원(${미율.toFixed(2)}%)이 있으나, 어느 달도 10%를 넘지 않습니다. 기간 합계는 그대로 쓰셔도 됩니다.</div>`
+        : `<div class="hint" style="margin:0">이 구간은 <b>원가 미확보가 없습니다</b>. 숫자를 그대로 쓰셔도 됩니다.</div>`);
+
+  if(invMode==='month'){
+    chart('invChart',{type:'bar',data:{labels:R.map(m=>m.ym),datasets:[
+        {label:'매출이익',data:R.map(m=>eokN(m.이익)),backgroundColor:'rgba(15,157,88,.88)',stack:'m',order:2},
+        {label:'매출원가',data:R.map(m=>eokN(m.원가)),backgroundColor:'rgba(20,184,166,.38)',stack:'m',order:2},
+        {label:'원가 미확보',data:R.map(m=>eokN(m.미확보)),backgroundColor:'rgba(217,119,6,.45)',stack:'m',order:2}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}억`,
+          footer:it=>{const m=R[it[0]?it[0].dataIndex:0]||{};
+            return `총매출 ${eokN(m.총매출||0).toFixed(1)}억 · 이익률 ${m.률==null?'–':m.률.toFixed(1)+'%'}`
+                 + (m.미확보율>=10?`\n⚠ 미확보 ${m.미확보율.toFixed(0)}% — 이 달 이익률은 대표성이 없습니다`:'');}}}},
+        scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>v+'억'}}}}});
+    tbl('t_invest',[
+      {h:'월',l:1,f:m=>`<b>${m.ym}</b>`+(m.미확보율>=10?' <span style="color:var(--gold);font-weight:700">⚠</span>':'')},
+      {h:'총매출',f:m=>won(m.총매출),style:()=>'font-weight:800;color:var(--brand-ink)'},
+      {h:'원가 확보 매출',f:m=>won(m.확보)},
+      {h:'매출원가',f:m=>won(m.원가)},
+      {h:'매출이익',f:m=>won(m.이익),style:m=>'font-weight:700;color:'+(m.이익<0?'var(--blocked)':'var(--ink1)')},
+      {h:'이익률',f:m=>m.률==null?'<span class="muted">–</span>':m.률.toFixed(1)+'%',style:()=>'font-weight:700'},
+      {h:'원가 미확보',f:m=>m.미확보?won(m.미확보):'<span class="muted">–</span>',style:m=>m.미확보율>=10?'color:var(--gold);font-weight:700':''},
+      {h:'미확보 건',f:m=>m.미확보건||'<span class="muted">–</span>'}
+    ],R,'해당 기간 데이터 없음');
+  }else{
+    $('invPeriodBox').innerHTML=
+      `<div style="font-size:13px;line-height:2.1;color:var(--ink1)">
+        <div>· 기간 — <b>${R.length?R[0].ym+' ~ '+R[R.length-1].ym:'–'}</b> (${R.length}개월)</div>
+        <div>· 총매출 — <b>${won(T.총매출)}원</b></div>
+        <div>· 매출원가 — <b>${won(T.원가)}원</b></div>
+        <div>· 매출이익 — <b>${won(T.이익)}원</b></div>
+        <div>· 이익률 — <b>${률.toFixed(1)}%</b> <span class="muted">(분모 = 원가 확보 매출 ${won(T.확보)}원)</span></div>
+        <div>· 원가 미확보 — <b>${won(T.미확보)}원</b> · ${T.건}건 <span class="muted">(총매출의 ${미율.toFixed(2)}%)</span></div>
+      </div>`;
+    tbl('t_investMiss',[
+      {h:'월',l:1,f:r=>r.ym},{h:'브랜드',l:1,f:r=>esc(r.브랜드)},
+      {h:'품목',l:1,f:r=>`<span title="${esc(r.품목)}">${esc(String(r.품목).slice(0,46))}</span>`},
+      {h:'홈사',l:1,f:r=>esc(r.홈사)},
+      {h:'수량',f:r=>won(r.수량)},
+      {h:'매출',f:r=>won(r.매출),style:()=>'font-weight:700;color:var(--gold)'}
+    ],INV_MISS,'이 구간은 원가 미확보가 없습니다',null,null,{filter:true});
+  }
+}
+
+$('invCsv').onclick=()=>{
+  const R=INV_ROWS;if(!R.length){toast('내보낼 자료가 없습니다','err');return;}
+  const esc2=s=>`"${String(s==null?'':s).replace(/"/g,'""')}"`;
+  const L=[['월','총매출','원가 확보 매출','매출원가','매출이익','이익률(%)','원가 미확보','미확보 건수']
+             .map(esc2).join(',')];
+  R.forEach(m=>L.push([m.ym,Math.round(m.총매출),Math.round(m.확보),Math.round(m.원가),Math.round(m.이익),
+    m.률==null?'':m.률.toFixed(1),Math.round(m.미확보),m.미확보건].map(esc2).join(',')));
+  L.push('');L.push(esc2('원가 미확보 내역'));
+  L.push(['월','브랜드','품목','홈사','수량','매출'].map(esc2).join(','));
+  INV_MISS.forEach(r=>L.push([r.ym,r.브랜드,r.품목,r.홈사,r.수량,Math.round(r.매출)].map(esc2).join(',')));
+  L.push('');
+  L.push(esc2('이익률은 «원가가 확보된 매출»만을 분모로 계산했습니다. 원가 미확보 매출은 분자·분모 어디에도 넣지 않았습니다.'));
+  const blob=new Blob(['﻿'+L.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`홈쇼핑_투자보고손익_${(R[0]||{}).ym||''}_${(R[R.length-1]||{}).ym||''}.csv`;
+  a.click();URL.revokeObjectURL(a.href);toast('CSV 내려받았습니다','ok');};
+
 async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
   if(!AUTHED){tbl('t_settle',[{h:'',l:1,f:()=>''}],null,'로그인 후 조회');return;}
   // 부가세 신고는 한 달치만 낸다 — 범위로 받으면 신고서가 틀린다
@@ -2698,6 +2935,7 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
     sum.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap">'+[['방송 수',n+'건'],['판매매출',won(sale)+'원'],['전환매출',won(conv)+'원'],['잠정손익 합',won(profit)+'원'],['평균 달성률',achAvg+'%']].map(k=>`<div class="sh-kpi" style="min-width:128px;flex:0 0 auto;margin:0;padding:12px 14px"><div class="l">${k[0]}</div><div class="v" style="font-size:18px">${k[1]}</div></div>`).join('')+'</div>';
     tbl('t_settle',[{h:'방송일자',l:1,f:r=>r.air_date||(r.air_at||'').slice(0,10)},{h:'홈사',l:1,f:r=>r.channel_name},{h:'제품',l:1,f:r=>(r.product_name||r.brand_name||'').slice(0,18)},{h:'판매매출',f:r=>won(r.판매매출)},{h:'전환매출',f:r=>won(r.전환매출)},{h:'수수료',f:r=>won((+r.정률수수료||0)+(+r.특약비||0))},{h:'PPL',f:r=>won(r.ppl)},{h:'잠정손익',f:r=>won(r.잠정손익),style:r=>'font-weight:700;color:'+(r.잠정손익<0?'var(--blocked)':'var(--ink1)')},{h:'달성률',f:r=>r.달성율!=null?(r.달성율*100).toFixed(0)+'%':'–'},{h:'입금예정',l:1,f:r=>r.입금예정일||'–'}],data,'방송직후 잠정 실적 없음',null,r=>openSettleReport(r.schedule_id),{filter:true});return;}
   if(settleMode==='vatrep'){await loadVatReport();return;}
+  if(settleMode==='xlsxout'){return;}   // 자리만 — 실제 동작은 버튼이 한다
   // 영업기준·회계마감기준은 같은 정산 원장을 본다. 컬럼(소비자판매가 / 정산액)만 다르다.
   // 예전엔 영업기준이 방송 원장(loadSalesBasis)이라 대행이 섞이고 회계마감과 40억 가까이 벌어졌다.
   if(settleMode==='monthly'){await loadSettleMonthly();return;}

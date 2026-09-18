@@ -1609,7 +1609,29 @@ function xlsxSave(rows, cols, fname, sheetName){
       const a=XLSX.utils.encode_cell({r:ri,c:ci}), cell=ws[a];
       if(cell&&cell.v!=null)cell.z=c.p?'0.0%':'#,##0';
     }});
+  /* 맨 아래 합계 행 — «필터를 걸면 보이는 것만» 계산한다.
+     SUM 이 아니라 SUBTOTAL 인 이유: SUM 은 필터로 숨긴 행까지 더해서,
+     홈사 하나만 걸러 놓고도 전체 합이 나온다. 그게 요청(234b1434)이 말한
+     「필터 걸어 합계·평균」을 못 지키는 지점이었다.
+       SUBTOTAL(9,…) = 합계 · SUBTOTAL(1,…) = 평균 — 둘 다 숨은 행을 뺀다.
+     비율 칸은 «단순평균»이다. 가중평균이 아니므로 머리글에 밝혀 둔다 —
+     원가율·달성률을 단순평균으로 읽으면 큰 방송과 작은 방송이 같은 무게가 된다. */
+  const S=R+2;                                   // 합계 행의 엑셀 행번호(1-based)
+  const sumRow=cols.map((c,ci)=>{
+    if(ci===0)return {t:'s',v:'합계 · 평균 (필터 반영)'};
+    if(!c.n&&!c.p)return null;
+    const L=XLSX.utils.encode_col(ci);
+    return {t:'n', f:`SUBTOTAL(${c.p?1:9},${L}2:${L}${R+1})`, z:c.p?'0.0%':'#,##0'};
+  });
+  sumRow.forEach((cell,ci)=>{ if(cell) ws[XLSX.utils.encode_cell({r:R+1,c:ci})]=cell; });
+  // 비율 칸 머리글에 표시 — 합계 행의 그 자리는 «합계»가 아니라 «단순평균»이다
+  cols.forEach((c,ci)=>{ if(!c.p)return;
+    const a=XLSX.utils.encode_cell({r:0,c:ci});
+    if(ws[a])ws[a].v=c.h+' (평균)';
+  });
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R+1,c:cols.length-1}});
   ws['!cols']=cols.map(c=>({wch:c.w||(c.n?14:c.p?9:16)}));
+  // 자동필터 범위에 합계 행을 «넣지 않는다». 넣으면 필터 목록에 합계가 값으로 뜬다.
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R,c:cols.length-1}})};
   ws['!freeze']={xSplit:0,ySplit:1};
   const wb=XLSX.utils.book_new();
@@ -2830,7 +2852,7 @@ async function loadInvest(){
 }
 
 function invRender(){
-  const R=INV_ROWS;
+  const R=INV_ROWS.slice().sort((a,b)=>a.ym<b.ym?-1:1);   // 기간 표기가 «끝~시작»으로 뒤집히지 않게
   const T=R.reduce((a,m)=>({총매출:a.총매출+m.총매출,미확보:a.미확보+m.미확보,원가:a.원가+m.원가,
                             확보:a.확보+m.확보,이익:a.이익+m.이익,건:a.건+m.미확보건}),
                    {총매출:0,미확보:0,원가:0,확보:0,이익:0,건:0});
@@ -2848,7 +2870,7 @@ function invRender(){
     ? `<div class="card" style="padding:12px 14px;border-color:var(--gold);background:var(--gold-bg)">
          <b style="font-size:12px">이 달들은 이익률을 그대로 쓰지 마십시오 — 원가 미확보가 10%를 넘습니다</b>
          <div style="margin-top:6px;font-size:12px;color:var(--ink2);line-height:1.7">${
-           bad.map(m=>`· <b>${m.ym}</b> — 총매출 ${eok(m.총매출)} 중 <b>${eok(m.미확보)}</b>가 미확보 (${m.미확보율.toFixed(0)}%). 표기 이익률 ${m.률==null?'–':m.률.toFixed(1)+'%'}는 나머지 ${eok(m.확보)}에 대한 값입니다.`).join('<br>')}</div></div>`
+           bad.map(m=>`· <b>${m.ym}</b> — 총매출 ${eok(m.총매출)} 중 <b>${eok(m.미확보)}</b> 미확보 (${m.미확보율.toFixed(0)}%). 표기 이익률 ${m.률==null?'–':m.률.toFixed(1)+'%'}는 나머지 ${eok(m.확보)}에 대한 값입니다.`).join('<br>')}</div></div>`
     : (T.미확보>0
         ? `<div class="hint" style="margin:0">원가 미확보 ${won(T.미확보)}원(${미율.toFixed(2)}%)이 있으나, 어느 달도 10%를 넘지 않습니다. 기간 합계는 그대로 쓰셔도 됩니다.</div>`
         : `<div class="hint" style="margin:0">이 구간은 <b>원가 미확보가 없습니다</b>. 숫자를 그대로 쓰셔도 됩니다.</div>`);
@@ -4521,7 +4543,12 @@ async function loadVatReport(){
   const totFree=rows.filter(r=>r.과세구분==='면세').reduce((a,r)=>a+(+r['부가세신고금액(V+)']||0),0);
   const totTax=rows.filter(r=>r.과세구분==='과세').reduce((a,r)=>a+(+r['부가세신고금액(V+)']||0),0);
   const totCost=rows.reduce((a,r)=>a+(+r['총원가(V-)']||0),0);
-  const totOp=rows.reduce((a,r)=>a+(+r.영업기준매출||0),0);
+  /* 「영업기준매출」은 이름이 틀린 칸이었다 — 안에 든 것은 «회계기준 매출»이다.
+     실측: 2026-07 롯데 아이비알커머스 339,982,000 = 정산 기준값, 소비자판매가는 376,714,880.
+     0918 에 뷰에 「회계기준매출」·「소비자판매가」를 옆에 세웠다. 화면은 새 칸을 읽는다.
+     옛 칸은 아직 뷰에 남아 있으나(다른 데서 읽을까 봐) 여기서는 쓰지 않는다. */
+  const totOp=rows.reduce((a,r)=>a+(+r.회계기준매출||+r.영업기준매출||0),0);
+  const totSale=rows.reduce((a,r)=>a+(+r.소비자판매가||0),0);
   const noCost=rows.filter(r=>r.원가미등록);
   const costBase=rows.filter(r=>!r.원가미등록).reduce((a,r)=>a+(+r['부가세신고금액(V+)']||0),0);
   const chs=[...new Set(rows.map(r=>r.채널))];
@@ -4535,7 +4562,8 @@ async function loadVatReport(){
      ${kpi('과세', won(totTax), tot?Math.round(100*totTax/tot)+'%':'–')}
      ${kpi('수수료', won(totFee), tot?('신고금액 대비 '+(100*totFee/tot).toFixed(1)+'%'):'–')}
      ${kpi('총 원가(V-)', won(totCost), costBase?('원가율 '+(100*totCost/costBase).toFixed(1)+'%'):'원가 미등록')}
-     ${kpi('영업기준 매출', won(totOp), '손익계산서 기준(순액법=수수료)')}
+     ${kpi('회계기준 매출', won(totOp), '손익계산서에 올라가는 매출 · 순액법=수수료수익')}
+     ${kpi('소비자판매가', won(totSale), totOp?('회계기준보다 '+(100*(totSale-totOp)/totOp).toFixed(1)+'% 큼'):'–')}
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       ${corps.length>1?`<span style="font-size:11.5px"><b>법인</b></span>
@@ -7077,6 +7105,17 @@ function settleConv(s){
   if(s&&s.conv_rate!=null)return {v:+s.conv_rate,missing:false,src:'편성'};
   return {v:0,missing:true,src:null};
 }
+/* «값이 없는 것»과 «못 읽는 것»은 다르다.
+   hs_results 는 RLS 로 막힌다 — 홈쇼핑팀이거나 임원·팀장이라야 읽는다(hs_is_lead_up).
+   편성·구성(hs_schedules·hs_broadcast_comp)은 더 넓게 열려 있어서,
+   권한이 없는 사람에게는 «편성은 보이는데 실적만 0» 인 반쪽 화면이 나온다.
+   그때 「입력되지 않았습니다」라고 하면 없는 죄를 담당자에게 씌운다. 2026-09-17 실제로 그랬다. */
+function hsCanReadResult(){
+  if(!ME)return false;
+  if(ME.is_admin||ME.can_all_teams||ME.grade==='경영진')return true;
+  if(ME.team_key==='homeshopping')return true;
+  return ME.grade==='임원'||ME.grade==='팀장';
+}
 /* ⚠ 이 화면은 «계산하지 않는다». 계산식은 DB 의 hs_settle_calc() 한 곳에만 있고,
    결산 목록 뷰(hs_v_settle_flash)도 같은 함수를 부른다. 여기서 다시 계산하면
    또 두 벌이 되고, 한쪽만 고치는 날 숫자가 갈린다 — 2026-09-03 에 실제로 3,524만원 갈렸다.
@@ -7146,9 +7185,14 @@ async function showSettle(){const s=BC,T=compTotals(),d=new Date(s.air_at),e=s.a
       <div style="display:flex;gap:7px;margin-bottom:18px">${summ('주문목표',baekman(tg)+'백만')}${summ('판매매출',baekman(sale)+'백만')}${summ('달성률',achieve+'%',1)}${summ('전환매출',baekman(convSale)+'백만')}${summ('미리주문',baekman(pre)+'백만')}</div>
       <div style="font-size:12px;font-weight:800;color:#0D9488;margin:0 0 8px 2px">손익 산출 · ${taxed?'VAT 제외 공급가':'전환매출'} 기준</div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid #E2ECE8;border-radius:10px;overflow:hidden">
-        ${convMissing?`<tr><td colspan="2" style="padding:10px 14px;background:#FEF2F2;color:#7F1D1D;font-size:12px;line-height:1.6;border-bottom:1px solid #FCA5A5">
+        ${convMissing?(hsCanReadResult()
+          ?`<tr><td colspan="2" style="padding:10px 14px;background:#FEF2F2;color:#7F1D1D;font-size:12px;line-height:1.6;border-bottom:1px solid #FCA5A5">
           <b>전환율이 입력되지 않았습니다.</b> 아래 전환매출과 손익은 «0%로 계산된 값»이라 실제와 다릅니다.<br>
-          편성 상세에서 전환율을 넣고 저장하시면 바로 맞춰집니다. — 판매매출 ${won(total)}원은 정상입니다.</td></tr>`:''}
+          편성 상세에서 전환율을 넣고 저장하시면 바로 맞춰집니다. — 판매매출 ${won(total)}원은 정상입니다.</td></tr>`
+          :`<tr><td colspan="2" style="padding:10px 14px;background:#FFF7E6;color:#7A4A06;font-size:12px;line-height:1.6;border-bottom:1px solid #F5D98B">
+          <b>이 계정은 홈쇼핑 «실적»을 볼 권한이 없습니다.</b> 값이 비어 있는 것이 아니라 읽지 못한 것입니다.<br>
+          그래서 전환율·전환매출·손익이 0으로 계산됐습니다 — <b>이 숫자를 쓰지 마십시오.</b>
+          편성·구성은 보이므로 주문목표·정액비는 정상입니다. 권한이 필요하시면 홈쇼핑팀에 요청해 주십시오.</td></tr>`):''}
         <tr><td style="padding:10px 14px;background:#EDF7F3;font-weight:800;color:#0F2A3F">전환매출액${taxed?' <span style="font-weight:500;font-size:10.5px;color:#6B8078">(VAT 제외)</span>':''}</td><td style="padding:10px 14px;background:#EDF7F3;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:#0D9488">${won(convSale)}</td></tr>
         ${ded}
         <tr><td style="padding:10px 14px;background:#F5F9F7;font-weight:800">차감 합계</td><td style="padding:10px 14px;background:#F5F9F7;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:#C24A4A">-${won(deduct)}</td></tr>

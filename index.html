@@ -714,7 +714,7 @@ body.acker-max main{padding-right:30px}
               <input id="fCompName" class="hsearch" placeholder="구성명 (예: 단품 2팩)" style="width:150px">
               <input id="fCompPrice" class="hsearch" inputmode="numeric" placeholder="판매가" style="width:100px">
               <button class="btn sm" id="fCompAdd" title="입력한 이름·판매가로 구성 추가">＋ 추가</button></div>
-            <div class="scroll"><table id="compTbl"><thead><tr><th class="l">구성</th><th>가격</th><th>미리주문 수량</th><th>미리주문 매출합계</th><th>미리주문 비율</th><th>방송중 수량</th><th>방송중 매출합계</th><th>방송중 비율</th><th>매출계</th><th></th></tr></thead><tbody id="compBody"></tbody></table></div>
+            <div class="scroll"><table id="compTbl"><thead><tr><th class="l">구성</th><th>가격</th><th>미리주문 수량</th><th>미리주문 매출합계</th><th title="위=금액 비중 · 아래=건수(수량) 비중. 둘이 8%p 넘게 벌어지면 색으로 표시합니다">미리주문 비율<br><span style="font-weight:400;font-size:9.5px;opacity:.75">금액 · 건수</span></th><th>방송중 수량</th><th>방송중 매출합계</th><th title="위=금액 비중 · 아래=건수(수량) 비중. 둘이 8%p 넘게 벌어지면 색으로 표시합니다">방송중 비율<br><span style="font-weight:400;font-size:9.5px;opacity:.75">금액 · 건수</span></th><th>매출계</th><th></th></tr></thead><tbody id="compBody"></tbody></table></div>
             <div class="muted" id="compNote" style="margin-top:8px"></div>
           </div>
           <div class="grid2">
@@ -724,6 +724,7 @@ body.acker-max main{padding-right:30px}
               <button class="btn sm" id="tickFullBtn" title="크게 보기 (전체화면)">⛶ 크게</button>
               <span class="muted" style="font-size:11.5px">강조 간격</span><select id="tickStep" style="width:auto"><option value="1">1분</option><option value="2">2분</option><option value="3">3분</option><option value="5" selected>5분</option></select>
               <button class="btn primary sm" id="genTick">1분 틱 생성</button><button class="btn sm" id="clrTick">비우기</button></div>
+            <div class="sh-kpis" id="tickKpis" style="margin:0 0 10px"></div>
             <div class="scroll" id="tickScroll" style="max-height:460px;overflow:auto"><table id="tickTbl"><thead id="tickHead"></thead><tbody id="tickBody"></tbody></table></div>
             <div class="muted" id="tickNote" style="margin-top:6px"></div>
           </div>
@@ -1056,6 +1057,28 @@ body.acker-max main{padding-right:30px}
         <div class="card" style="margin-top:12px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><h3 style="margin:0">편성 역추천</h3><span class="muted" style="font-size:11.5px">이 제품·목표를 언제·어디에 편성하면 기대손익이 가장 큰가</span><div class="spacer"></div><button class="btn sm" id="simReco">역추천 실행</button></div>
           <div class="scroll" style="padding:0"><table id="t_reco"><thead><tr><th class="l">홈사</th><th class="l">요일·시간대</th><th>표본</th><th>중앙 달성률</th><th class="l">정산기준</th><th>기대손익</th><th>손익률</th></tr></thead><tbody><tr><td colspan="7" class="state">역추천 실행을 누르세요.</td></tr></tbody></table></div>
+        </div>
+
+        <!-- 시간대 성과 — 기존 slot(「심야(00-06)」 한 칸에 312건)으로는 «25시가 좋다»를 말할 수 없다.
+             시 단위로 갈라서 본다. 25·24·26시 표기는 현장 관행 그대로 쓴다(대표 확정 2026-09-18). -->
+        <div class="card" style="margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <h3 style="margin:0">시간대 성과</h3>
+            <span class="muted" style="font-size:11.5px">2020년부터 쌓인 방송으로 «어느 시각»이 어땠는지</span>
+            <div class="spacer"></div>
+            <label style="margin:0;color:var(--ink3);font-size:11.5px">홈사</label>
+            <select id="shCh" style="width:auto"><option value="">전체</option></select>
+            <label style="margin:0;color:var(--ink3);font-size:11.5px">최소 표본</label>
+            <select id="shMinN" style="width:auto"><option value="5">5건</option><option value="10" selected>10건</option><option value="20">20건</option><option value="30">30건</option></select>
+            <button class="btn sm" id="shRun">보기</button>
+          </div>
+          <p class="hint" style="margin:0 0 10px">
+            <b>달성률과 규모를 같이 보십시오.</b> 한쪽만 보면 추천이 한쪽으로 몰립니다 —
+            25시는 목표가 황금시간대의 1/5이라 달성률이 높게 나오고, 19·20시는 목표가 커서 달성률이 낮아 보입니다.
+            «목표를 안정적으로 채우는 시간»과 «돈이 큰 시간»은 다릅니다.
+            <br>표기는 현장 관행대로 <b>24·25·26시</b>(익일 새벽)를 씁니다. 03시부터는 그대로입니다.
+          </p>
+          <div class="scroll" style="padding:0"><table id="t_slothour"><tbody><tr><td class="state">「보기」를 누르세요.</td></tr></tbody></table></div>
         </div>
       </div>
 
@@ -5410,6 +5433,59 @@ async function simReco(){if(!AUTHED){toast('로그인 후 이용','err');return;
   tbl('t_reco',[{h:'홈사',l:1,f:r=>`<b>${esc(r.ch)}</b>`},{h:'요일·시간대',l:1,f:r=>`${DK[r.dow]||r.dow} · ${r.slot}`},{h:'표본',f:r=>r.n+'건'},{h:'중앙 달성률',f:r=>r.a.toFixed(0)+'%'},{h:'정산기준',l:1,f:r=>r.basis},{h:'기대손익',f:r=>`<b style="color:${r.pr<0?'var(--blocked)':'var(--ink1)'}">${won(Math.round(r.pr))}</b>`},{h:'손익률',f:r=>r.mg.toFixed(1)+'%'}],rows,'표본 없음');
   toast('기대손익 상위 편성 정렬','ok');}
 $('simReco')&&($('simReco').onclick=simReco);
+
+/* ===== 시간대 성과 =====
+   달성률 하나로 줄 세우지 않는다. 실측(2026-09-18):
+     25시  208건 · 달성률중앙 81.0% · 실적중앙 0.63억 · 목표중앙 0.81억
+     20시  172건 · 달성률중앙 81.0% · 실적중앙 3.03억 · 목표중앙 4.20억
+   달성률은 «같고» 규모는 5배 다르다. 달성률만 보여주면 편성이 새벽으로 몰린다.
+   그래서 두 축을 한 표에 나란히 두고, 막대로 규모를 같이 보여준다. */
+let SH_ROWS=[];
+/* 홈사 목록은 «데이터에서» 채운다. 손으로 적어 두면 새 홈사가 생겨도 안 따라오고,
+   표기가 한 글자만 달라도 조회가 0건이 된다(hs_broadcast_history.channel_norm 이 정본). */
+async function shFillChannels(){
+  const sel=$('shCh'); if(!sel||sel.dataset.filled)return;
+  try{
+    const rows=await fetchAll(()=>sb.from('hs_v_broadcast_slot').select('channel_norm').not('achieve_pct','is',null));
+    const cnt={}; (rows||[]).forEach(r=>{if(r.channel_norm)cnt[r.channel_norm]=(cnt[r.channel_norm]||0)+1;});
+    const list=Object.entries(cnt).filter(([,n])=>n>=10).sort((a,b)=>b[1]-a[1]);
+    sel.innerHTML='<option value="">전체</option>'+list.map(([c,n])=>`<option value="${esc(c)}">${esc(c)} (${n})</option>`).join('');
+    sel.dataset.filled='1';
+  }catch(_){/* 목록을 못 채워도 «전체»로는 볼 수 있어야 한다 */}
+}
+async function loadSlotHour(){
+  if(!AUTHED){tbl('t_slothour',[{h:'',l:1,f:()=>''}],null,'로그인 후 조회');return;}
+  const btn=$('shRun'); if(btn){btn.disabled=true;btn.textContent='보는 중…';}
+  try{
+    await shFillChannels();
+    const ch=$('shCh').value||null, minN=+$('shMinN').value||10;
+    const {data,error}=await sb.rpc('hs_slot_hour_stats',{p_channel:ch,p_min_n:minN});
+    if(error)throw error;
+    SH_ROWS=data||[];
+    if(!SH_ROWS.length){tbl('t_slothour',[{h:'',l:1,f:()=>''}],null,'표본이 부족합니다 — 최소 표본을 낮춰 보세요');return;}
+    const maxOrd=Math.max(...SH_ROWS.map(r=>+r.order_med||0),1);
+    const bar=v=>{const p=Math.round(100*(+v||0)/maxOrd);
+      return `<div style="background:var(--bg2);border-radius:3px;height:7px;width:74px;display:inline-block;vertical-align:middle;overflow:hidden">`
+            +`<div style="background:var(--brand);height:100%;width:${p}%"></div></div>`;};
+    tbl('t_slothour',[
+      {h:'시간대',l:1,f:r=>`<b>${esc(r.hour_label)}</b>`+(r.is_late?'<span class="chip" style="background:var(--gold-bg);color:var(--gold);margin-left:5px;font-size:9.5px">심야</span>':'')},
+      {h:'표본',f:r=>r.n+'건'},
+      {h:'달성률 <span class="muted" style="font-weight:400;font-size:10px">중앙</span>',
+       f:r=>`<b>${(+r.ach_med).toFixed(0)}%</b>`,style:()=>'font-weight:700'},
+      {h:'달성률 폭 <span class="muted" style="font-weight:400;font-size:10px">하위25~상위25</span>',l:1,
+       f:r=>`<span class="muted" style="font-size:11px">${(+r.ach_p25).toFixed(0)}% ~ ${(+r.ach_p75).toFixed(0)}%</span>`},
+      {h:'실적 <span class="muted" style="font-weight:400;font-size:10px">중앙</span>',
+       f:r=>`${bar(r.order_med)} <b style="margin-left:5px">${eok(+r.order_med||0)}</b>`,l:1},
+      {h:'목표 <span class="muted" style="font-weight:400;font-size:10px">중앙</span>',f:r=>eok(+r.target_med||0)},
+      {h:'홈사',f:r=>r.channels+'곳'}
+    ],SH_ROWS,'표본 없음',null,null,{filter:true});
+    toast(`${SH_ROWS.length}개 시간대`,'ok');
+  }catch(e){toast('시간대 성과 조회 실패: '+(e.message||e),'err');}
+  finally{if(btn){btn.disabled=false;btn.textContent='보기';}}
+}
+$('shRun')&&($('shRun').onclick=loadSlotHour);
+$('shCh')&&($('shCh').onchange=loadSlotHour);
+$('shMinN')&&($('shMinN').onchange=loadSlotHour);
 $('simRun').onclick=runSim;
 // 추가수수료율을 바꾸면 그 수수료율 기준으로 정액비를 다시 추천
 $('sComm')&&$('sComm').addEventListener('change',()=>{simTouched=false;runSim();});['sTarget','sConv','sCostRate','sRate','sFixed'].forEach(i=>$(i).addEventListener('input',()=>{if(document.querySelector('#t_sim tbody tr:not(.state)'))renderSim();}));
@@ -6688,7 +6764,24 @@ function updCompNote(){const T=compTotals();const lastTick=TICKS.filter(t=>t.sal
       ${nc.rows.map(c=>'· '+esc(c.name||'')).join('<br>')}<br>
       코드가 없으면 «품목원가»가 안 붙고 <b>원가율 ${Math.round((+$('fCost').value||27))}%로 추정</b>됩니다. 손익이 실제와 달라집니다.<br>
       구성을 지우고 「상품에서 추가」로 다시 넣으시면 코드가 붙습니다. 상품 목록에 없으면 상품 등록이 먼저입니다.</div>`:'');}
+/* 구성 비율 — «금액»과 «건수»를 같이 보여준다 (대표 지시 2026-09-18)
+   한 가지만 보면 구성 전략을 반대로 읽는다.
+     금액 비중 > 건수 비중  →  적게 팔렸는데 매출이 큰 «고가 소량»
+     금액 비중 < 건수 비중  →  많이 팔렸는데 매출은 작은 «미끼»
+   그 차이(%p)가 8 을 넘으면 색으로 표시한다. 눈으로 찾게 하지 않는다. */
+function compRateCell(amt,amtTot,qty,qtyTot){
+  if(!amtTot&&!qtyTot)return '<td class="muted">–</td>';
+  const a=amtTot?Math.round(amt/amtTot*100):0, q=qtyTot?Math.round(qty/qtyTot*100):0, gap=a-q;
+  const big=Math.abs(gap)>=8;
+  const col=!big?'var(--ink3)':(gap>0?'var(--brand)':'var(--gold)');
+  const tip=!big?'':(gap>0?`고가 소량 — 매출 비중이 건수보다 ${gap}%p 높습니다`
+                          :`저가 다량 — 건수 비중이 매출보다 ${-gap}%p 높습니다`);
+  return `<td style="white-space:nowrap" ${tip?`title="${tip}"`:''}>`
+        +`<b>${a}%</b>`
+        +`<span style="font-size:10px;color:${col};margin-left:3px">건 ${q}%</span></td>`;
+}
 function renderComp(){const T=compTotals(),SpreA=T.preAmt,SonA=T.onAmt,dis='';   // 구성은 방송 후에도 입력 가능
+  const SpreQ=+T.pre||0, SonQ=+T.on||0;   // 건수(수량) 합계 — 비율의 분모
   $('compBody').innerHTML=COMPS.map((c,i)=>{const price=+c.price||0,preQ=+c.preorder_qty||0,onQ=+c.onair_qty||0,preA=price*preQ,onA=price*onQ,tot=preA+onA;
     return `<tr><td class="l"><span title="${esc(c.name||'')}">${esc((c.name||'').slice(0,38))}</span>`
       +(c.set_code?`<span class="chip" style="background:var(--bg2);color:var(--ink3);margin-left:4px;font-size:9.5px">${esc(c.set_code)}</span>`
@@ -6696,16 +6789,17 @@ function renderComp(){const T=compTotals(),SpreA=T.preAmt,SonA=T.onAmt,dis='';  
       +`</td>`
       +`<td><input ${dis} class="cell2" type="number" value="${price}" data-i="${i}" data-f="price"></td>`
       +`<td><input ${dis} class="cell2" type="number" value="${preQ}" data-i="${i}" data-f="preorder_qty"></td>`
-      +`<td>${won(preA)}</td><td>${SpreA?Math.round(preA/SpreA*100):0}%</td>`
+      +`<td>${won(preA)}</td>${compRateCell(preA,SpreA,preQ,SpreQ)}`
       +`<td><input ${dis} class="cell2" type="number" value="${onQ}" data-i="${i}" data-f="onair_qty"></td>`
-      +`<td>${won(onA)}</td><td>${SonA?Math.round(onA/SonA*100):0}%</td>`
+      +`<td>${won(onA)}</td>${compRateCell(onA,SonA,onQ,SonQ)}`
       +`<td style="font-weight:700">${won(tot)}</td>`
       +`<td style="white-space:nowrap">${dis?'':
           `<button class="compUp" data-i="${i}" title="위로" ${i===0?'disabled':''} style="border:none;background:transparent;color:${i===0?'var(--line1)':'var(--ink3)'};cursor:${i===0?'default':'pointer'};font-size:13px;line-height:1;padding:2px 2px">▲</button>`
         + `<button class="compDn" data-i="${i}" title="아래로" ${i===COMPS.length-1?'disabled':''} style="border:none;background:transparent;color:${i===COMPS.length-1?'var(--line1)':'var(--ink3)'};cursor:${i===COMPS.length-1?'default':'pointer'};font-size:13px;line-height:1;padding:2px 2px">▼</button>`
         + `<button class="compDel" data-i="${i}" title="구성 삭제" style="border:none;background:transparent;color:var(--blocked);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px">✕</button>`}</td></tr>`;}).join('')
     +(()=>{const sales=SpreA+SonA;
-     return `<tr style="background:var(--bg1);font-weight:800"><td class="l">합계</td><td>–</td><td>${won(T.pre)}</td><td>${won(SpreA)}</td><td>${SpreA?'100%':'0%'}</td><td>${won(T.on)}</td><td>${won(SonA)}</td><td>${SonA?'100%':'0%'}</td><td>${won(sales)}</td><td></td></tr>`;})();
+     const pct100=v=>`<td style="white-space:nowrap"><b>${v?'100%':'0%'}</b><span style="font-size:10px;color:var(--ink3);margin-left:3px">건 ${v?'100%':'0%'}</span></td>`;
+     return `<tr style="background:var(--bg1);font-weight:800"><td class="l">합계</td><td>–</td><td>${won(T.pre)}</td><td>${won(SpreA)}</td>${pct100(SpreA)}<td>${won(T.on)}</td><td>${won(SonA)}</td>${pct100(SonA)}<td>${won(sales)}</td><td></td></tr>`;})();
   document.querySelectorAll('#compBody input').forEach(inp=>{
     inp.addEventListener('input',()=>{const i=+inp.dataset.i,f=inp.dataset.f;COMPS[i][f]=(+inp.value||0);renderKpis();updCompNote();if(f==='price')renderTick();});
     inp.addEventListener('change',()=>renderComp());});
@@ -6741,11 +6835,38 @@ const tickHasData=t=>!!(t.comp_qtys&&Object.values(t.comp_qtys).some(v=>+v>0));
 function tickCums(){const cums=[];let last=0;for(const t of TICKS){const c=tickHasData(t)?tickSales(t):last;cums.push(c);last=c;}return cums;}
 function tickLastCum(){let r={sales:0,qty:0};for(const t of TICKS){if(tickHasData(t))r={sales:tickSales(t),qty:COMPS.reduce((a,c)=>a+(+(t.comp_qtys||{})[c.seq]||0),0)};}return r;}
 const dmFmt=dm=>dm==null?'–':(dm>0?'+'+won(dm):(dm<0?won(dm):'0'));
+/* 콜 찍는 화면의 KPI 띠 (개발요청 8a5ede3b · 신호아 2026-09-03)
+   「콜 모니터에는 몇퍼했는지 보이지만 콜 찍을땐 보이지가 않습니다」
+
+   ⚠ 숫자를 여기서 «새로 계산하지 않는다». tickCums()·tickLastCum() 을 그대로 쓴다.
+     같은 방송이 두 숫자가 되는 사고가 2026-09-03 에 실제로 났다(3,524만원).
+   ⚠ 목표가 없으면 달성률 칸을 «띄우지 않는다». 0% 로 보이면 「목표 대비 0」과 구분이 안 된다. */
+function renderTickKpis(){
+  const el=$('tickKpis'); if(!el)return;
+  if(!TICKS.length||!COMPS.length){el.innerHTML='';return;}
+  const last=tickLastCum(), cums=tickCums();
+  const tgt=+((BC&&BC.target_sales)||0);
+  // 분당 매출 — 마지막으로 «입력이 있었던» 두 틱 사이의 증가분 ÷ 경과분
+  let rpm=null;{
+    const idx=[]; TICKS.forEach((t,i)=>{if(tickHasData(t))idx.push(i);});
+    if(idx.length>=2){const a=idx[idx.length-2],b=idx[idx.length-1];
+      const dm=(new Date(TICKS[b].tick_at)-new Date(TICKS[a].tick_at))/60000;
+      rpm=dm>0?Math.round((cums[b]-cums[a])/dm):null;}
+  }
+  let lastCalls=null; for(let i=TICKS.length-1;i>=0;i--){if(TICKS[i].calls!=null){lastCalls=TICKS[i].calls;break;}}
+  const k=(l,v,s,c)=>`<div class="sh-kpi ${c||''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||''}</div></div>`;
+  el.innerHTML=
+     (tgt?k('달성률',Math.round(last.sales/tgt*100)+'%','목표 '+won(tgt),'brand'):'')
+    +k('누적 매출',won(last.sales)+'원','구성 수량 기준')
+    +k('누적 수량',won(last.qty)+'개','')
+    +k('최종 콜',lastCalls==null?'–':won(lastCalls),'마지막 입력 틱')
+    +k('분당 매출',rpm==null?'–':(rpm>0?'+':'')+won(rpm)+'원','직전 입력 대비');
+}
 function paintTickCols(){const N=COMPS.length,rows=$('tickBody').children,cums=tickCums();for(let i=0;i<TICKS.length;i++){const row=rows[i];if(!row)continue;const dm=i>0?cums[i]-cums[i-1]:null;if(row.children[2+N])row.children[2+N].textContent=won(cums[i]);if(row.children[3+N])row.children[3+N].innerHTML=dmFmt(dm);}}
 function renderTick(){const N=COMPS.length,first=TICKS.length?new Date(TICKS[0].tick_at).getTime():0,step=TICK_ST.step||5,dis=tickEditable()?'':'disabled';
   const compCols=COMPS.map(c=>`<th style="text-align:center" title="${esc(c.name||'')}">${esc((c.name||'구성').slice(0,7))}<br><small class="muted" style="font-weight:400">${won(c.price||0)}</small></th>`).join('');
   $('tickHead').innerHTML=`<tr><th style="text-align:center">시각</th><th style="text-align:center">콜</th>${compCols}<th style="text-align:center">매출(누적)</th><th style="text-align:center">매출증감</th><th style="text-align:center">특이사항</th></tr>`;
-  if(!TICKS.length){$('tickBody').innerHTML=`<tr><td colspan="${5+N}" class="state">“1분 틱 생성”을 누르세요</td></tr>`;$('tickNote').textContent='';syncBcChart();return;}
+  if(!TICKS.length){$('tickBody').innerHTML=`<tr><td colspan="${5+N}" class="state">“1분 틱 생성”을 누르세요</td></tr>`;$('tickNote').textContent='';renderTickKpis();syncBcChart();return;}
   TICKS.forEach(t=>{t.sales_amt=tickSales(t);});
   const cums=tickCums();
   $('tickBody').innerHTML=TICKS.map((t,i)=>{const el=first?Math.round((new Date(t.tick_at).getTime()-first)/60000):0,hl=(el%step===0);
@@ -6781,7 +6902,9 @@ function recalcTickRow(i){TICKS[i].sales_amt=tickSales(TICKS[i]);
   paintTickCols();   // 누적 이월이 뒤 틱들에도 영향 → 전 행 다시 칠함
   syncOnairFromTicks();renderKpis();tickNoteUpd();syncBcChart();updCompNote();}
 function tickNoteUpd(){const L=tickLastCum();
-  $('tickNote').innerHTML=`최종 누적 판매수량 <b>${won(L.qty)}개</b> · 누적 매출 <b>${won(L.sales)}</b> <span class="muted">(마지막 입력 틱 기준)</span>`;}
+  $('tickNote').innerHTML=`최종 누적 판매수량 <b>${won(L.qty)}개</b> · 누적 매출 <b>${won(L.sales)}</b> <span class="muted">(마지막 입력 틱 기준)</span>`;
+  renderTickKpis();   // KPI 띠도 같이 — 갱신 지점이 여러 곳이라 여기 한 군데에만 건다
+}
 $('tickStep').onchange=()=>{TICK_ST.step=+$('tickStep').value||5;renderTick();};
 function genTicksNow(silent){const {startIso,endIso}=bcTimes();if(!startIso){if(!silent)toast('방송 시작시각을 먼저 입력하세요','err');return;}
   const start=new Date(startIso);let end=endIso?new Date(endIso):new Date(start.getTime()+60*60000);
@@ -6852,7 +6975,11 @@ async function clRender(){const id=CL_ID;if(!id)return;await ensureChannels();
   let last=null;for(let i=tks.length-1;i>=0;i--){if(tks[i].calls!=null){last=tks[i];break;}}
   const totQty=li>=0?cps.reduce((a,c)=>a+(+(tks[li].comp_qtys||{})[c.seq]||0),0):0,tgt=+s.target_sales||0;
   const d=new Date(s.air_at),e=s.air_end?new Date(s.air_end):null,nowT=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const shown=tks.map((t,i)=>({t,i})).filter(x=>x.t.calls!=null||Object.keys(x.t.comp_qtys||{}).length).slice(-60);
+  /* 특이사항만 적은 줄도 보여준다 (개발요청 8a5ede3b · 신호아 2026-09-03)
+     콜·구성수량이 없어도 «메모가 있으면» 그 시각에 무슨 일이 있었다는 뜻이다.
+     예전 조건은 calls 와 comp_qtys 만 봐서, 「게스트 멘트 후 콜 급증」 같은 기록이
+     단톡 공유 링크에서 통째로 사라졌다. 현장이 남긴 관찰을 화면이 버리고 있었다. */
+  const shown=tks.map((t,i)=>({t,i})).filter(x=>x.t.calls!=null||Object.keys(x.t.comp_qtys||{}).length||String(x.t.memo||'').trim()).slice(-60);
   // 구성명이 잘려 3/6/9개월 구분이 안 되던 문제 — 공통 접두어(브랜드·라인)는 한 번만 쓰고 컬럼엔 구분되는 부분만
   const compPrefix=(function(){const ns=cps.map(c=>(c.name||'').trim()).filter(Boolean);
     if(ns.length<2)return '';let p=ns[0];
@@ -6860,9 +6987,21 @@ async function clRender(){const id=CL_ID;if(!id)return;await ensureChannels();
     p=p.replace(/[^\s]*$/,'');return p.trim().length>=2?p:'';})();
   const compLabel=c=>{let n=(c.name||'').trim();if(compPrefix&&n.startsWith(compPrefix))n=n.slice(compPrefix.length).trim();return n||(c.name||'');};
   const compTh=cps.map(c=>`<th title="${esc(c.name||'')}" style="white-space:normal;word-break:keep-all;min-width:56px;max-width:92px;line-height:1.25">${esc(compLabel(c))}</th>`).join('');
-  const body=shown.map(({t,i})=>{const q=t.comp_qtys||{},qc=cps.map(c=>`<td style="text-align:center">${q[c.seq]||''}</td>`).join('');
+  const body=shown.map(({t,i})=>{const q=t.comp_qtys||{};
+    /* 「메모만 있는 줄」 — 콜도 수량도 «안 잰» 것이지 «0» 이 아니다.
+       0 으로 쓰면 「그 시각 콜이 0이었다」는 측정 기록이 되어 버린다. 그래서 «–» 로 둔다.
+       매출 누적은 직전 값을 그대로 잇는다(cums 가 이미 그렇게 계산한다) — 이 줄에서 매출이
+       꺾인 것처럼 보이면 안 된다. 줄 전체를 연한 노랑으로 구분해 단톡 캡처에서도 눈에 띄게 한다. */
+    const onlyMemo=(t.calls==null)&&!Object.keys(q).length&&String(t.memo||'').trim();
+    const dash='<span style="color:#C9B78E">–</span>';
+    const qc=cps.map(c=>`<td style="text-align:center">${onlyMemo?dash:(q[c.seq]||'')}</td>`).join('');
     const rpm=rate[i],rpmTxt=rpm==null?'<span style="color:#bbb">–</span>':(rpm>0?'+'+won(rpm):(rpm<0?won(rpm):'0'));
-    return `<tr><td>${new Date(t.tick_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</td><td style="text-align:center;font-weight:700">${t.calls??''}</td>${qc}<td style="text-align:right;font-weight:700;color:#0D9488">${rpmTxt}</td><td style="text-align:right;font-weight:700">${won(cums[i])}</td><td>${esc(t.memo||'')}</td></tr>`;}).join('')||`<tr><td colspan="${4+cps.length}" style="text-align:center;padding:24px;color:#888">아직 입력된 콜이 없습니다</td></tr>`;
+    const tr=onlyMemo?' style="background:#FFFBEB"':'';
+    return `<tr${tr}><td${onlyMemo?' style="color:#92400E"':''}>${new Date(t.tick_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</td>`
+      +`<td style="text-align:center;font-weight:700">${onlyMemo?dash:(t.calls??'')}</td>${qc}`
+      +`<td style="text-align:right;font-weight:700;color:#0D9488">${onlyMemo?dash:rpmTxt}</td>`
+      +`<td style="text-align:right;font-weight:700${onlyMemo?';color:#C9B78E':''}">${won(cums[i])}</td>`
+      +`<td${onlyMemo?' style="color:#92400E;font-weight:600"':''}>${onlyMemo?'📌 ':''}${esc(t.memo||'')}</td></tr>`;}).join('')||`<tr><td colspan="${4+cps.length}" style="text-align:center;padding:24px;color:#888">아직 입력된 콜이 없습니다</td></tr>`;
   v.innerHTML=`<div style="max-width:940px;margin:0 auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:18px">📞 실시간 콜 현황</b><span style="color:#888;font-size:12px">${nowT} 기준 · 15초 자동 새로고침 · 조회 전용</span><div style="flex:1"></div><a href="#home" onclick="event.preventDefault();location.replace(location.pathname+'#home');location.reload();return false" style="font-size:12px;color:#0f766e;text-decoration:none">콘솔로 →</a></div>
     <div style="font-size:16px;font-weight:800">${esc(BCH[s.channel_id]||'')} · ${esc(s.product_name||'')}</div>

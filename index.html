@@ -3726,8 +3726,23 @@ function suSniff(wb){
         // 제목 한 줄짜리 행을 헤더로 착각하지 않도록 — 실제 헤더는 칸이 여럿 차 있다
         if(main.filter(c=>c!=null&&c!=='').length<3)continue;
         const hdr=p.hdr2?(main.map((c,i)=>{const s=(grid[r+1]||[])[i];return (s==null||s==='')?c:s;})):main;
-        if(p.sig.every(s=>suCol(hdr,s)>=0))
+        if(p.sig.every(s=>suCol(hdr,s)>=0)){
+          /* 파일명이 「직매입」인데 위수탁 양식으로 잡히면 «파일명을 믿는다» (회계 0921 요청)
+             2026-07·08 NS 직매입 파일이 위수탁·순액법으로 들어가 8월 매출이 316만원 어긋났다.
+             원인은 담당자가 원본에 소비자판매가·수수료 열을 «참고용»으로 손으로 붙여서,
+             그 열 때문에 파서가 위수탁 양식(ns_com)으로 오인한 것이었다.
+             칸 구성은 사람이 바꿀 수 있지만 파일명의 「직매입」은 뜻이 분명하다. */
+          const fn=String(SU.file||'');
+          if(/직매입|특약/.test(fn) && p.deal && p.deal!=='직매입'){
+            const dir=SU_PRESETS.find(x=>x.ch===p.ch && x.deal==='직매입');
+            if(dir){
+              const hdr2=p.hdr2?(main.map((c,i)=>{const s=(grid[r+1]||[])[i];return (s==null||s==='')?c:s;})):main;
+              return {preset:dir,sheet:sn,grid,hdr:hdr2,dataFrom:r+(dir.hdr2?2:1),hdrRow:r+1,
+                      forcedBy:`파일명에 「직매입」이 있어 «${dir.name}»으로 읽습니다 (칸만 보면 «${p.name}»으로 잡힙니다)`};
+            }
+          }
           return {preset:p,sheet:sn,grid,hdr,dataFrom:r+(p.hdr2?2:1),hdrRow:r+1};
+        }
       }
     }
   }
@@ -3742,6 +3757,9 @@ function suPresetBanner(){
    ? `<div style="background:#E8F5EC;border:1px solid #A8D8B9;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#14532D;line-height:1.6">
         <b>「${esc(p.name)}」 양식으로 읽습니다.</b> 컬럼 연결·집계를 자동으로 맞췄으니 그대로 미리보기를 누르시면 됩니다.
         <div style="font-size:11.5px;margin-top:3px;color:#3F6B4E">${esc(p.note)} · 주문 단위 행은 품목별로 합쳐서 넣습니다.</div>
+        ${SU.preset.forcedBy?`<div style="margin-top:7px;background:#FFFBEB;border:1px solid #F0D9A0;border-radius:7px;padding:7px 10px;font-size:11.5px;color:#92400E;line-height:1.55">
+           <b>📌 파일명을 기준으로 양식을 바꿨습니다.</b><br>${esc(SU.preset.forcedBy)}<br>
+           원본에 소비자판매가·수수료 열을 손으로 붙이시면 칸만 보고는 위수탁으로 읽힙니다. 그래서 파일명을 우선합니다.</div>`:''}
         <button class="btn sm" id="suPresetOff" style="margin-top:8px">직접 연결할게요</button>
       </div>`
    : `<div style="background:#FDF1DE;border:1px solid #F5D98B;border-radius:10px;padding:11px 13px;font-size:12.5px;color:#7A4A06;line-height:1.6">

@@ -671,7 +671,7 @@ body.acker-max main{padding-right:30px}
           <div class="calhead"><button class="btn sm" id="backCal">‹ 편성으로</button><h2 class="sec" id="bcTitle" style="margin-left:6px">방송</h2><div class="spacer"></div>
             <button class="btn sm" id="delBc" style="color:var(--blocked);border-color:#f3c9c9">삭제</button><button class="btn primary sm" id="saveBc">방송 저장</button><button class="btn sm" id="genReport">보고 멘트</button><button class="btn primary sm" id="genSettle">정산서</button></div>
           <div class="card"><div id="bcSub" style="font-size:17px;font-weight:800;color:var(--ink1);letter-spacing:-.01em;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--brand-soft)"></div><div style="display:flex;gap:10px;flex-wrap:wrap" id="bcKpis"></div></div>
-          <div class="card"><h3 style="display:flex;align-items:center;gap:8px">방송 정보 <span id="bcLock" style="display:none;color:var(--blocked);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">방송 완료 · 편성 조건 잠금 <span style="color:var(--ok);font-weight:600">(실적·구성은 입력 가능)</span></span><button class="btn sm" id="bcUnlock" style="display:none;font-size:11px;padding:3px 10px">수정 잠금 해제</button><span id="bcUnlocked" style="display:none;color:var(--gold);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">잠금 해제됨 — 수정 내역이 기록됩니다</span></h3>
+          <div class="card"><h3 style="display:flex;align-items:center;gap:8px">방송 정보 <span id="bcLock" style="display:none;color:var(--blocked);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">방송 완료 · 편성 조건 잠금 <span style="color:var(--done,#16A34A);font-weight:600">(실적·구성은 입력 가능)</span></span><button class="btn sm" id="bcUnlock" style="display:none;font-size:11px;padding:3px 10px">수정 잠금 해제</button><span id="bcUnlocked" style="display:none;color:var(--gold);font-weight:700;font-size:11px;text-transform:none;letter-spacing:0">잠금 해제됨 — 수정 내역이 기록됩니다</span></h3>
             <div class="row3"><div><label><span style="color:#DC2626" title="저장 필수">●</span> 홈쇼핑사 <span class="muted" id="fChTag" style="font-weight:400"></span></label><select id="fChannel"></select></div><div><label>브랜드 <span class="muted" id="fBrandHint" style="font-weight:400"></span></label><select id="fBrand"></select></div><div><label>라인 <span class="muted" id="fLineHint" style="font-weight:400"></span></label><select id="fLineTop"><option value="">라인 선택</option></select></div></div>
             <div class="row3"><div style="grid-column:1 / -1"><label><span style="color:#DC2626" title="저장 필수">●</span> 방송이름 <span class="muted" style="font-weight:400">브랜드·라인 자동 · 수정 가능</span></label><input id="fProduct" placeholder="위에서 브랜드·라인을 고르면 자동으로 채워집니다"></div></div>
             <div class="row3"><div><label>정산 구분</label><div class="seg" id="fFeeSeg"><button type="button" data-v="정액" class="on">정액</button><button type="button" data-v="정률">정률</button></div></div><div><div id="fFixedBox"><label>특약비(원)</label><input type="text" inputmode="numeric" id="fFixed"></div><div id="fRateBox" style="display:none"><label id="fRateLbl">홈사 수수료율(%)</label><input type="number" id="fRate"></div></div><div><label>거래 구분</label><div class="seg" id="fDealSeg"><button type="button" data-v="자사" class="on">자사</button><button type="button" data-v="대행">대행</button></div><span class="hint" id="dealHint" style="display:none;font-size:10.5px">대행: 수익 = 매출 × 대행수수료율</span></div></div>
@@ -2977,7 +2977,15 @@ async function loadSettle(){const sum=$('settleSummary');sum.innerHTML='';
     data=(data||[]).filter(r=>mrHit(r.air_at,RG));
     const n=data.length,sale=data.reduce((a,r)=>a+(+r.판매매출||0),0),conv=data.reduce((a,r)=>a+(+r.전환매출||0),0),profit=data.reduce((a,r)=>a+(+r.잠정손익||0),0);
     const ach=data.filter(r=>r.달성율!=null),achAvg=ach.length?Math.round(ach.reduce((a,r)=>a+(+r.달성율||0),0)/ach.length*100):0;
-    sum.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap">'+[['방송 수',n+'건'],['판매매출',won(sale)+'원'],['전환매출',won(conv)+'원'],['잠정손익 합',won(profit)+'원'],['평균 달성률',achAvg+'%']].map(k=>`<div class="sh-kpi" style="min-width:128px;flex:0 0 auto;margin:0;padding:12px 14px"><div class="l">${k[0]}</div><div class="v" style="font-size:18px">${k[1]}</div></div>`).join('')+'</div>';
+    /* 2026-11-06 · 대표 실측(a2e66f5b) — 「판매매출·전환매출·잠정손익 합」이 칸에서 잘렸다.
+       원인은 이 한 줄에 있었다. 셸은 숫자 칸을 «칸 폭을 따라 글자가 줄어들게» 만들어 뒀는데
+         .sh-kpis  칸 최소 230px (auto-fit 그리드)
+         .sh-kpi .v  font-size:clamp(15px,10.4cqi,24px) · nowrap · overflow:hidden · text-overflow:clip
+       여기서 셋을 전부 우회했다 — 그리드 대신 flex, 칸을 128px 로 좁히고,
+       인라인 font-size:18px 로 clamp 를 덮었다. 칸이 좁아져도 글자가 안 줄고,
+       넘치면 clip 이라 «조용히 잘린다». 09-03 에 45곳을 표준으로 바꾸면서 이 줄만 남았다.
+       → 래퍼를 .sh-kpis 로 돌리고 인라인 폭·글자크기를 뺀다. 칸 수는 셸이 알아서 흘린다. */
+    sum.innerHTML='<div class="sh-kpis" style="margin:0">'+[['방송 수',n+'건'],['판매매출',won(sale)+'원'],['전환매출',won(conv)+'원'],['잠정손익 합',won(profit)+'원'],['평균 달성률',achAvg+'%']].map(k=>`<div class="sh-kpi" style="padding:12px 14px"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('')+'</div>';
     tbl('t_settle',[{h:'방송일자',l:1,f:r=>r.air_date||(r.air_at||'').slice(0,10)},{h:'홈사',l:1,f:r=>r.channel_name},{h:'제품',l:1,f:r=>(r.product_name||r.brand_name||'').slice(0,18)},{h:'판매매출',f:r=>won(r.판매매출)},{h:'전환매출',f:r=>won(r.전환매출)},{h:'수수료',f:r=>won((+r.정률수수료||0)+(+r.특약비||0))},{h:'PPL',f:r=>won(r.ppl)},{h:'잠정손익',f:r=>won(r.잠정손익),style:r=>'font-weight:700;color:'+(r.잠정손익<0?'var(--blocked)':'var(--ink1)')},{h:'달성률',f:r=>r.달성율!=null?(r.달성율*100).toFixed(0)+'%':'–'},{h:'입금예정',l:1,f:r=>r.입금예정일||'–'}],data,'방송직후 잠정 실적 없음',null,r=>openSettleReport(r.schedule_id),{filter:true});return;}
   if(settleMode==='vatrep'){await loadVatReport();return;}
   if(settleMode==='xlsxout'){return;}   // 자리만 — 실제 동작은 버튼이 한다
@@ -3990,7 +3998,9 @@ $('suPreview')&&($('suPreview').onclick=async()=>{
       <div class="sh-kpi"><div class="l">매출총액 합</div><div class="v">${eok(sum)}</div></div>
       <div class="sh-kpi ${noBrand?'warn':''}"><div class="l">브랜드 미매칭</div><div class="v">${noBrand}행</div><div class="s">저장 후 검수에서 확인</div></div>
       <div class="sh-kpi ${rows.filter(r=>r.sellout_amount==null).length?'warn':''}"><div class="l">소비자판매가 미입력</div><div class="v">${rows.filter(r=>r.sellout_amount==null).length}행</div><div class="s">영업기준이 정산액으로 잡힙니다</div></div>
-      <div class="sh-kpi"><div class="l">거래유형</div><div class="v" style="font-size:15px">${[...new Set(rows.map(r=>r.deal_form||'미지정'))].join(' · ')}</div></div>
+      <!-- 여기만 숫자가 아니라 «글자»가 들어간다(직매입 · 위수탁 · 미지정 …).
+           숫자 칸은 nowrap + clip 이라 길어지면 조용히 잘린다 — 글자는 두 줄로 흘린다. -->
+      <div class="sh-kpi"><div class="l">거래유형</div><div class="v" style="font-size:15px;white-space:normal;word-break:keep-all;line-height:1.3">${[...new Set(rows.map(r=>r.deal_form||'미지정'))].join(' · ')}</div></div>
     </div>
     <div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
       <thead><tr style="color:var(--ink3)"><th class="l" style="padding:4px 8px">품목</th><th>수량</th><th>매출총액</th><th>공급가</th><th>신고금액</th><th>SellOut</th><th>과세</th><th class="l">방송일</th><th class="l">신고월</th><th class="l">브랜드</th></tr></thead>
@@ -4716,20 +4726,20 @@ async function loadSettleMonthly(){
        그 달은 <b>영업기준이 정산액으로 잡혀</b> 회계마감과 같은 숫자가 됩니다 — 홈사 몫만큼 작게 보입니다.
        <span class="muted">옛 정산서 양식에 그 칸이 없었던 것이라 입력 누락이 아닙니다.
        ${esc(yms.slice(0,6).join(', '))}${yms.length>6?` 외 ${yms.length-6}개월`:''}</span></div>`;}}
-  sum.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <div class="sh-kpi" style="min-width:190px;flex:0 0 auto;margin:0;padding:12px 14px;border:2px solid var(--brand)">
+  sum.innerHTML=`<div class="sh-kpis" style="margin:0">
+    <div class="sh-kpi" style="padding:12px 14px;border:2px solid var(--brand)">
       <div class="l">${isAcct?'회계마감기준 (세금계산서)':'영업기준 (고객 Sell Out)'}</div>
-      <div class="v" style="font-size:22px">${won(tot)}원</div>
+      <div class="v">${won(tot)}원</div>
       <div class="s">${RG.from?(RG.from===RG.to?mrLabel(RG.to):mrLabel(RG.from)+' ~ '+mrLabel(RG.to)):'전체 기간'} · ${arr.length}개 ${ax.h}</div></div>
-    <div class="sh-kpi" style="min-width:150px;flex:0 0 auto;margin:0;padding:12px 14px">
+    <div class="sh-kpi" style="padding:12px 14px">
       <div class="l">${isAcct?'영업기준 대비':'회계마감 대비'}</div>
-      <div class="v" style="font-size:18px">${won(totOther)}원</div>
+      <div class="v">${won(totOther)}원</div>
       <div class="s">${totOther?Math.round(100*tot/totOther)+'%':'–'}</div></div>
-    <div class="sh-kpi" style="min-width:158px;flex:0 0 auto;margin:0;padding:12px 14px;border:2px solid var(--ok)">
+    <div class="sh-kpi${totProfit<0?' warn':''}" style="padding:12px 14px;border:2px solid var(--done,#16A34A)">
       <div class="l">매출이익 <span class="muted" style="font-weight:400;font-size:10px">회계마감−원가</span></div>
-      <div class="v" style="font-size:18px;color:${totProfit<0?'var(--blocked)':'var(--ok)'}">${won(totProfit)}원</div>
+      <div class="v" style="color:${totProfit<0?'var(--blocked,#E5484D)':'var(--done,#16A34A)'}">${won(totProfit)}원</div>
       <div class="s">${totAcct?('이익률 '+Math.round(100*totProfit/totAcct)+'%'):'–'}${anyMiss?' · ⚠원가 일부 미등록':''}</div></div>
-    ${arr.slice(0,4).map(a=>`<div class="sh-kpi" style="min-width:150px;flex:0 0 auto;margin:0;padding:12px 14px"><div class="l">${esc(String(a.k).slice(0,14))}</div><div class="v" style="font-size:15px">${won(a[amtKey])}원</div><div class="s">${tot?Math.round(100*a[amtKey]/tot):0}%</div></div>`).join('')}
+    ${arr.slice(0,4).map(a=>`<div class="sh-kpi" style="padding:12px 14px"><div class="l">${esc(String(a.k).slice(0,14))}</div><div class="v">${won(a[amtKey])}원</div><div class="s">${tot?Math.round(100*a[amtKey]/tot):0}%</div></div>`).join('')}
     </div>
     ${gapMsg}
     <div class="seg" id="axisSeg" style="max-width:600px;margin:12px 0 0">${Object.entries(AXIS).filter(([k])=>k!=='corp'||SETTLE_CORP_ON).map(([k,v])=>`<button class="${k===SET_AXIS?'on':''}" data-v="${k}">${v.h==='홈사 그룹'?v.h:v.h+'별'}</button>`).join('')}</div>`;
@@ -4812,16 +4822,16 @@ async function loadSalesBasis(){
     if(r.이익!=null){a.이익+=r.이익;a.hasProfit=true;}a.miss=a.miss||r.miss;});
   const arr=Object.values(agg).sort((x,y)=>y.매출-x.매출);
   const tot=arr.reduce((s,a)=>s+a.매출,0),totProfit=arr.reduce((s,a)=>s+a.이익,0),anyMiss=arr.some(a=>a.miss);
-  sum.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <div class="sh-kpi" style="min-width:190px;flex:0 0 auto;margin:0;padding:12px 14px;border:2px solid var(--brand)">
+  sum.innerHTML=`<div class="sh-kpis" style="margin:0">
+    <div class="sh-kpi" style="padding:12px 14px;border:2px solid var(--brand)">
       <div class="l">영업기준 · 방송월 주문매출</div>
-      <div class="v" style="font-size:22px">${won(tot)}</div>
+      <div class="v">${won(tot)}</div>
       <div class="s">${ym||'전체 기간'} · ${rows.length}개 방송</div></div>
-    <div class="sh-kpi" style="min-width:158px;flex:0 0 auto;margin:0;padding:12px 14px;border:2px solid var(--ok)">
+    <div class="sh-kpi" style="padding:12px 14px;border:2px solid var(--done,#16A34A)">
       <div class="l">매출이익 <span class="muted" style="font-weight:400;font-size:10px">주문−원가</span></div>
-      <div class="v" style="font-size:18px;color:${totProfit<0?'var(--blocked)':'var(--ok)'}">${won(totProfit)}</div>
+      <div class="v" style="color:${totProfit<0?'var(--blocked,#E5484D)':'var(--done,#16A34A)'}">${won(totProfit)}</div>
       <div class="s">${anyMiss?'⚠ 자사 원가 연결 대기':'이익률 '+(tot?Math.round(100*totProfit/tot):0)+'%'}</div></div>
-    ${arr.slice(0,3).map(a=>`<div class="sh-kpi" style="min-width:130px;flex:0 0 auto;margin:0;padding:12px 14px"><div class="l">${esc(String(a.k).slice(0,14))}</div><div class="v" style="font-size:17px">${eok(a.매출)}</div><div class="s">${tot?Math.round(100*a.매출/tot):0}%</div></div>`).join('')}
+    ${arr.slice(0,3).map(a=>`<div class="sh-kpi" style="padding:12px 14px"><div class="l">${esc(String(a.k).slice(0,14))}</div><div class="v">${eok(a.매출)}</div><div class="s">${tot?Math.round(100*a.매출/tot):0}%</div></div>`).join('')}
     </div>
     <div style="background:var(--bg1);border:1px solid var(--line1);border-radius:9px;padding:8px 12px;margin-top:8px;font-size:11.5px;color:var(--ink3)">방송월 귀속(방송한 달로 실적 집계) · 자사 매출이익은 방송 구성 <b>세트코드</b>에 원가(원가표·BOM)가 연결되면 자동으로 채워집니다. 대행은 대행수수료수익 기준.</div>
     <div class="seg" id="sbAxisSeg" style="max-width:320px;margin:10px 0 0">${Object.keys(AX).map(k=>`<button class="${k===SB_AXIS?'on':''}" data-v="${k}">${k}별</button>`).join('')}</div>`;
@@ -5031,11 +5041,11 @@ async function loadAgPnl(){
   const sum=$('agPnlSummary');
   const n=data.length,sale=data.reduce((a,r)=>a+(+r.판매매출||0),0),our=data.reduce((a,r)=>a+(+r.잠정손익||0),0),vend=data.reduce((a,r)=>a+(+r.대행사잠정손익||0),0),miss=data.filter(r=>r.대행수수료율==null).length;
   const rate=sale?(100*our/sale):0;
-  sum.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap">'+[
+  sum.innerHTML='<div class="sh-kpis" style="margin:0">'+[
     ['방송 수',n+'건'],['대행 매출',eok(sale)],['대행사 잠정손익',eok(vend)],
     ['우리 잠정매출익',eok(our)],['평균 수수료율',rate?rate.toFixed(1)+'%':'–'],
     ['요율 미등록',miss+'건']
-  ].map(k=>`<div class="sh-kpi" style="min-width:128px;flex:0 0 auto;margin:0;padding:12px 14px"><div class="l">${k[0]}</div><div class="v" style="font-size:18px">${k[1]}</div></div>`).join('')+'</div>';
+  ].map(k=>`<div class="sh-kpi" style="padding:12px 14px"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('')+'</div>';
   agCharts();
   tbl('t_agPnl',[
     {h:'방송일자',l:1,f:r=>r.air_date||(r.air_at||'').slice(0,10)},
@@ -5420,15 +5430,15 @@ function renderSim(){const t=num('sTarget'),cv=num('sConv')/100,cr=num('sCostRat
   const P={t,cv,cr,rate,fx,fee:simFee},S=SIM_SAMPLES,has=S.length>0;
   const aP10=pctl(S,0.1),aP50=pctl(S,0.5),aP90=pctl(S,0.9),aMean=has?S.reduce((a,b)=>a+b,0)/S.length:null;
   const be=breakEven(P),pwin=has?S.filter(a=>pnlAt(a,P)>0).length/S.length:null;
-  const wc=x=>x==null?'var(--ink3)':(x>=0.6?'var(--ok)':x>=0.4?'var(--gold)':'var(--blocked)');
+  const wc=x=>x==null?'var(--ink3)':(x>=0.6?'var(--done,#16A34A)':x>=0.4?'var(--gold)':'var(--blocked)');
   $('simScope').textContent=SIMST?('· '+SIMST.scope+' '+SIMST.n+'건'):'';
   $('simDist').textContent=has?`${aP10.toFixed(0)}% · ${aP50.toFixed(0)}% · ${aP90.toFixed(0)}%`:'–';
-  $('simBE').innerHTML=be===Infinity?'<span style="color:var(--blocked)">구조상 흑자 불가</span>':(be===0?'<span style="color:var(--ok)">0% · 구조상 흑자</span>':`<b>${be.toFixed(0)}%</b>`);
+  $('simBE').innerHTML=be===Infinity?'<span style="color:var(--blocked)">구조상 흑자 불가</span>':(be===0?'<span style="color:var(--done,#16A34A)">0% · 구조상 흑자</span>':`<b>${be.toFixed(0)}%</b>`);
   $('simPwin').innerHTML=pwin==null?'–':`<b style="color:${wc(pwin)}">${Math.round(pwin*100)}%</b>`;
   $('simN').textContent=SIMST?(SIMST.n+'건·'+SIMST.scope):(has?S.length+'건':'–');
   $('simNote').textContent=SIM_RECO?`추천 표본 ${SIM_RECO.n}건 · 최신 ${SIM_RECO.latest_date||''} ${(SIM_RECO.latest_product||'').slice(0,14)}`:(AUTHED?'과거 표본 부족 — 입력값 계산':'로그인 시 과거 기준 자동');
-  const pk=(l,a,hi)=>{const pnl=a==null?null:pnlAt(a,P);return `<div class="sh-kpi ${hi||''}"><div class="l">${l}</div><div class="v" style="font-size:17px;color:${pnl==null?'var(--ink3)':(pnl<0?'var(--blocked)':'var(--ink1)')}">${pnl==null?'–':won(Math.round(pnl))}</div><div class="s">${a==null?'':'달성 '+a.toFixed(0)+'%'}</div></div>`;};
-  $('simProb').innerHTML=has?(pk('비관 P10',aP10)+pk('기대(평균)',aMean,'brand')+pk('중앙 P50',aP50)+pk('낙관 P90',aP90)+`<div class="sh-kpi"><div class="l">흑자 확률</div><div class="v" style="font-size:17px;color:${wc(pwin)}">${Math.round(pwin*100)}%</div><div class="s">손익분기 ${be===Infinity?'∞':be.toFixed(0)+'%'}</div></div>`):'<div class="state" style="padding:14px">시뮬 실행 시 과거 분포로 확률형 손익이 표시됩니다.</div>';
+  const pk=(l,a,hi)=>{const pnl=a==null?null:pnlAt(a,P);return `<div class="sh-kpi ${hi||''}"><div class="l">${l}</div><div class="v" style="color:${pnl==null?'var(--ink3)':(pnl<0?'var(--blocked)':'var(--ink1)')}">${pnl==null?'–':won(Math.round(pnl))}</div><div class="s">${a==null?'':'달성 '+a.toFixed(0)+'%'}</div></div>`;};
+  $('simProb').innerHTML=has?(pk('비관 P10',aP10)+pk('기대(평균)',aMean,'brand')+pk('중앙 P50',aP50)+pk('낙관 P90',aP90)+`<div class="sh-kpi"><div class="l">흑자 확률</div><div class="v" style="color:${wc(pwin)}">${Math.round(pwin*100)}%</div><div class="s">손익분기 ${be===Infinity?'∞':be.toFixed(0)+'%'}</div></div>`):'<div class="state" style="padding:14px">시뮬 실행 시 과거 분포로 확률형 손익이 표시됩니다.</div>';
   let bands=[{l:'보수(80%)',p:80},{l:'목표(100%)',p:100,b:1},{l:'상향(120%)',p:120},{l:'대박(150%)',p:150}];
   if(has){bands.push({l:'과거 P10',p:aP10,h:1});bands.push({l:'과거 중앙',p:aP50,h:1,m:1});bands.push({l:'과거 P90',p:aP90,h:1});}
   bands.sort((a,b)=>a.p-b.p);
@@ -5436,7 +5446,7 @@ function renderSim(){const t=num('sTarget'),cv=num('sConv')/100,cr=num('sCostRat
   [...document.querySelectorAll('#t_sim tbody tr')].forEach((tr,i)=>{if(bands[i]&&bands[i].m)tr.style.background='var(--brand-soft)';else if(bands[i]&&bands[i].b)tr.style.background='var(--bg2)';});
   const aRef=has?aP50:100, feeFx=(SIM_RECO&&SIM_RECO.fee_latest)?Math.round(SIM_RECO.fee_latest):fx, commR=((SIM_RECO&&SIM_RECO.comm_latest)?+SIM_RECO.comm_latest:num('sRate'))/100;
   const pnlFx=pnlAt(aRef,{t,cv,cr,rate:0,fx:feeFx,fee:'정액'}), pnlRt=pnlAt(aRef,{t,cv,cr,rate:commR,fx:0,fee:'정률'}), winr=pnlFx>=pnlRt?'정액':'정률';
-  $('simVs').innerHTML=`<div class="kv"><span class="k">기준 달성률</span><span class="v">${aRef.toFixed(0)}%</span></div><div class="kv"><span class="k">정액 · 정액비 ${baekman(feeFx)}백만</span><span class="v" style="color:${pnlFx<0?'var(--blocked)':'var(--ink1)'}">${won(Math.round(pnlFx))}</span></div><div class="kv"><span class="k">정률 · 수수료 ${fmtp(commR*100)}</span><span class="v" style="color:${pnlRt<0?'var(--blocked)':'var(--ink1)'}">${won(Math.round(pnlRt))}</span></div><div class="kv"><span class="k">유리한 구조</span><span class="v"><b style="color:var(--ok)">${winr}</b> · 차이 ${won(Math.round(Math.abs(pnlFx-pnlRt)))}</span></div>`;
+  $('simVs').innerHTML=`<div class="kv"><span class="k">기준 달성률</span><span class="v">${aRef.toFixed(0)}%</span></div><div class="kv"><span class="k">정액 · 정액비 ${baekman(feeFx)}백만</span><span class="v" style="color:${pnlFx<0?'var(--blocked)':'var(--ink1)'}">${won(Math.round(pnlFx))}</span></div><div class="kv"><span class="k">정률 · 수수료 ${fmtp(commR*100)}</span><span class="v" style="color:${pnlRt<0?'var(--blocked)':'var(--ink1)'}">${won(Math.round(pnlRt))}</span></div><div class="kv"><span class="k">유리한 구조</span><span class="v"><b style="color:var(--done,#16A34A)">${winr}</b> · 차이 ${won(Math.round(Math.abs(pnlFx-pnlRt)))}</span></div>`;
   const aRows=has?[['P10',aP10],['중앙',aP50],['P90',aP90]]:[['보수',80],['목표',100],['상향',120]];
   const crCols=[Math.max(0,Math.round((cr-0.05)*1000)/1000),cr,Math.round((cr+0.05)*1000)/1000];
   const sens=$('t_sens');if(sens){sens.querySelector('thead').innerHTML='<tr><th class="l">달성 \\ 원가율</th>'+crCols.map(c=>`<th>${Math.round(c*100)}%</th>`).join('')+'</tr>';
@@ -5658,7 +5668,7 @@ async function loadHubData(){const b=HUB_BRAND;
   HUB_DIRTY={};
   const withCost=HUB_ROWS.filter(r=>r.auto_cost!=null).length;
   $('hubStatus').innerHTML=canSeeCost()
-    ? `세트코드 <b>${HUB_ROWS.length}</b>개 · 원가있음 <b style="color:var(--ok)">${withCost}</b> · <span style="color:var(--gold)">원가없음 ${HUB_ROWS.length-withCost}</span>`
+    ? `세트코드 <b>${HUB_ROWS.length}</b>개 · 원가있음 <b style="color:var(--done,#16A34A)">${withCost}</b> · <span style="color:var(--gold)">원가없음 ${HUB_ROWS.length-withCost}</span>`
     : `세트코드 <b>${HUB_ROWS.length}</b>개 · 원가는 대표·임원만 열람합니다`;
   renderHub();}
 function renderHub(){const q=($('hubSearch').value||'').trim().toLowerCase();
@@ -6165,7 +6175,7 @@ async function loadPresetGrid(){
   const mapped=(ex||[]).filter(r=>r.set_code).length;
   const scope=channel?`<b>${esc(BCH[channel]||'')}</b> 예외`:'<b>기본</b> (전체 홈사)';
   let msg;
-  if(mapped) msg=`${scope} · <span style="color:var(--ok)">구성 ${mapped}개 저장됨</span>`;
+  if(mapped) msg=`${scope} · <span style="color:var(--done,#16A34A)">구성 ${mapped}개 저장됨</span>`;
   else if(channel) msg=`${scope} · <span class="muted">예외 없음 — "+ 구성 추가"로 만들면 이 홈사만 별도 적용 (없으면 기본이 적용됨)</span>`;
   else msg=`${scope} · <span style="color:var(--gold)">구성 없음 — "+ 구성 추가"로 시작</span>`;
   msg+=' <span class="muted">· 판매가는 여기서 정한 값이 방송 편성 구성에 그대로 들어갑니다(비우면 SKU 판매가 자동).</span>';
@@ -6182,7 +6192,7 @@ function renderPresetGrid(){
   $('presetBody').innerHTML=(PSTATE.rows.length?PSTATE.rows.map((r,i)=>{
     const sku=r.set_code?((PICKP.find(x=>x.code===r.set_code)||{}).price):null;   // SKU 탭에 등록된 판매가
     const eff=r.price!=null?+r.price:(sku!=null?+sku:null);
-    const src=r.price!=null?'<span style="color:var(--ok);font-weight:700">직접 입력</span>'
+    const src=r.price!=null?'<span style="color:var(--done,#16A34A);font-weight:700">직접 입력</span>'
              :(sku!=null?'<span class="muted">SKU 판매가 자동</span>':'<span style="color:var(--blocked)">미설정</span>');
     return `<tr>
       <td class="l"><input class="cell2" style="width:118px" value="${esc(r.preset_name)}" data-i="${i}" data-f="preset_name"><div class="muted" style="font-size:10px">방송표기: ${esc(b)} ${esc(r.preset_name)}</div></td>
@@ -7851,7 +7861,7 @@ function renderDevReq(){const box=$('drList'),f=DR.filter;let rows=DR.rows||[];
   if(f!=='all')rows=rows.filter(r=>drGroup(r.status)===f);
   if(!rows.length){box.innerHTML='<div class="card" style="padding:22px;text-align:center;color:var(--ink3)">해당 상태의 요청이 없습니다.</div>';return;}
   box.innerHTML=rows.map(r=>{const g=drGroup(r.status);
-    const col=g==='done'?'var(--ok)':g==='in_progress'?'var(--gold)':g==='other'?'var(--ink3)':'var(--brand-ink)';
+    const col=g==='done'?'var(--done,#16A34A)':g==='in_progress'?'var(--gold)':g==='other'?'var(--ink3)':'var(--brand-ink)';
     const nm=(r.meta&&r.meta.requester_name)||r.requester_email||'—';
     const dt=new Date(r.created_at).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
     const pr={low:'낮음',high:'높음',urgent:'긴급'}[r.priority]||'';

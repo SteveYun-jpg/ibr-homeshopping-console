@@ -818,6 +818,11 @@ body.acker-max main{padding-right:30px}
                 <div><label class="muted" style="font-size:11px">시트</label><select id="suSheet" style="min-width:140px"></select></div>
                 <div><label class="muted" style="font-size:11px">헤더 행</label><input id="suHeaderRow" type="number" min="1" value="1" style="width:70px"></div>
                 <div><label class="muted" style="font-size:11px">법인 <span style="color:#DC2626">●</span></label><select id="suCorp" style="min-width:130px" title="이 정산서가 어느 법인 것인지. 정산서는 법인별로 따로 발행됩니다."></select></div>
+                <!-- 2026-11-17 — 법인 표기를 «파일 이름에서 정규식으로» 뽑고 있었다. 오타 하나에 무너졌다:
+                     「CJ…(아이비알머커스) 10월」 419행이 「아이비알」로, 「롯데…(아아비알) 9월」 1,530행이
+                     표기 없음으로 들어갔다. 금액은 맞지만 법인 구분이 틀렸다.
+                     → 추정은 기본값으로만 쓰고, 최종 판단은 사람이 고른다. -->
+                <div><label class="muted" style="font-size:11px">법인 표기</label><select id="suCorpNote" style="min-width:120px" title="정산서에 적힌 법인 표기입니다. 파일 이름에서 추정해 미리 골라 두지만, 틀렸으면 바꿔 주세요. 결산 숫자에는 영향이 없고 법인별로 갈라 볼 때 씁니다."><option value="">표기 없음</option><option>아이비알커머스</option><option>아이비알</option><option>누아픽</option></select></div>
                 <div><label class="muted" style="font-size:11px">홈쇼핑사</label><select id="suChannel" style="min-width:150px"></select></div>
                 <div><label class="muted" style="font-size:11px">정산월 <span style="font-size:10px">(발생월)</span></label><input type="month" id="suYm" class="hsearch" style="max-width:140px" title="매출이 일어난 달입니다. 세금계산서를 다른 달에 끊었으면 파일의 「신고월」 칸을 연결해 주세요 — 없으면 이 달로 신고합니다."></div>
                 <div><label class="muted" style="font-size:11px">정산방식</label><select id="suType" style="min-width:100px"><option>총액법</option><option>순액법</option></select></div>
@@ -827,7 +832,8 @@ body.acker-max main{padding-right:30px}
               <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
                 <button class="btn sm" id="suPreview">미리보기</button>
                 <button class="btn primary sm" id="suSave" disabled>정산 원장에 저장</button>
-                <label style="display:flex;gap:5px;align-items:center;font-size:11.5px" class="muted"><input type="checkbox" id="suReplace" checked> 같은 홈사·정산월 기존 데이터 교체</label>
+                <label style="display:flex;gap:5px;align-items:center;font-size:11.5px" class="muted"><input type="checkbox" id="suReplace" checked> 같은 파일 기존 데이터 교체</label>
+                <label style="display:flex;gap:5px;align-items:center;font-size:11.5px" class="muted" title="이 홈사·정산월·법인의 다른 정산서까지 지웁니다. 홈사가 파일 이름을 바꿔 수정본을 다시 보낸 경우에만 켜세요."><input type="checkbox" id="suReplaceAll"> 그 달 전체 교체</label>
                 <span class="muted" id="suMsg" style="font-size:11.5px"></span>
               </div>
             </div>
@@ -3898,6 +3904,7 @@ $('suFile')&&($('suFile').onchange=async e=>{
     $('suSheet').value=best;
     await ensureChannels();
     await suCorps();
+    suCorpNoteGuess();            // 파일 이름에서 «추정»해 미리 골라만 둔다 — 최종 판단은 사람
     $('suChannel').innerHTML='<option value="">— 홈쇼핑사 선택 —</option>'+Object.entries(BCH).sort((a,z)=>String(a[1]).localeCompare(String(z[1]),'ko')).map(([id,nm])=>`<option value="${id}">${esc(nm)}</option>`).join('');
     SU.preset=suSniff(SU.wb);SU.usePreset=!!SU.preset;
     const pch=SU.preset&&Object.keys(BCH).find(k=>BCH[k]===SU.preset.preset.ch);
@@ -4030,6 +4037,20 @@ function suChecksum(rows,file){
    그래서 행이 아니라 파일 단위로 고른다. 파일명에 법인이 있으면 자동으로 잡고,
    없으면 마지막에 고른 법인을 그대로 둔다(같은 법인을 연속으로 올리는 게 보통이라).  */
 let SU_CORPS=[];
+/* 2026-11-17 — 파일 이름에서 법인 표기를 «추정»한다. 어디까지나 기본값이다.
+   실측으로 확인한 오타: 「아이비알머커스」(→아이비알커머스), 「아아비알」(→아이비알).
+   그래서 글자가 조금 틀려도 잡히게 느슨하게 보고, 결과는 사람이 고친다. */
+function suCorpNoteGuess(){
+  const el=$('suCorpNote');if(!el)return;
+  const s=String(SU.file||'');
+  const g=/누아픽/.test(s) ? '누아픽'
+        : /아[이아]비알\s*[머커][머커]스/.test(s) ? '아이비알커머스'   // 커머스·머커스 둘 다
+        : /아[이아]비알/.test(s) ? '아이비알' : '';
+  el.value=g;
+  // 추정이 어디서 왔는지 보이게 — 사람이 「왜 이게 골라졌지」를 묻지 않게
+  el.title=(g?`파일 이름에서 「${g}」으로 추정했습니다. `:'파일 이름에서 법인 표기를 찾지 못했습니다. ')
+    +'틀렸으면 바꿔 주세요. 결산 숫자에는 영향이 없고 법인별로 갈라 볼 때 씁니다.';
+}
 async function suCorps(){
   if(SU_CORPS.length)return SU_CORPS;
   const {data}=await sb.from('hs_v_settle_corp').select('id,code,name,is_default');
@@ -4195,17 +4216,31 @@ async function suMarkOpen(ch,ym,name){
   suStatus(true);
 }
 
-async function suPreflight(ch,ym,forms,rows,file,corp){
+async function suPreflight(ch,ym,forms,rows,file,corp,all){
   const chName=BCH[ch]||'';
   // 법인까지 맞춰서 비교한다. 안 그러면 누아픽 7월 롯데를 올릴 때
   // 아이비알커머스 7월 롯데와 대조되어 "전부 교체"로 보인다.
-  let q=sb.from('hs_settle_raw').select('qty,gross_amount,sellout_amount,source_file,deal_form').eq('channel_id',ch).eq('settle_month',ym);
+  let q=sb.from('hs_settle_raw').select('qty,gross_amount,sellout_amount,source_file,deal_form,product_name').eq('channel_id',ch).eq('settle_month',ym);
   if(corp)q=q.eq('tenant_id',corp);
   if(forms.length===1)q=q.eq('deal_form',forms[0]);
   const {data:old}=await q;
-  const O=old||[];
+  /* 2026-11-18 — 교체 범위를 「그 달 전체」→「같은 파일」로 바꿨다 (대표 승인).
+     한 달에 정산서가 여러 장 온다: 2026-10 CJ 는 마지스 전용 17행과 나머지 419행이 «겹침 0»이었다.
+     그 달 통째로 지우면 한 장이 다른 장을 지운다 (2026-03 에 6행이 1,000행·2.2억을 지웠다).
+     그래서 기본은 같은 source_file 만 지우고, 그 달 전체 교체는 «체크로 명시»할 때만 한다.
+     cur 는 «실제로 지워질 범위», oth 는 그대로 남는 다른 파일이다. */
+  const ALL=old||[];
+  const O=all?ALL:ALL.filter(r=>r.source_file===file);
+  const OT=all?[]:ALL.filter(r=>r.source_file!==file);
   const sum=(a,f)=>a.reduce((x,r)=>x+(+r[f]||0),0);
-  const cur={n:O.length,g:sum(O,'gross_amount'),q:sum(O,'qty'),files:[...new Set(O.map(r=>r.source_file).filter(Boolean))]};
+  const cur={n:O.length,g:sum(O,'gross_amount'),q:sum(O,'qty'),files:[...new Set(O.map(r=>r.source_file).filter(Boolean))],all:!!all};
+  const oth={n:OT.length,g:sum(OT,'gross_amount'),files:[...new Set(OT.map(r=>r.source_file||'(파일명 없음)'))]};
+  /* 다른 파일과 같은 거래가 겹치는지 — 파일 이름만 바꾼 수정본이면 «그대로 쌓여 두 번 계상»된다.
+     품목명·수량·금액이 모두 같은 행을 같은 거래로 본다 (한 건씩 짝지어 센다). */
+  const kk=r=>[String(r.product_name||'').trim(),+r.qty||0,+r.gross_amount||0].join('|');
+  const pool=new Map();OT.forEach(r=>{const k=kk(r);pool.set(k,(pool.get(k)||0)+1);});
+  let ovl=0;rows.forEach(r=>{const k=kk(r),c=pool.get(k)||0;if(c){ovl++;pool.set(k,c-1);}});
+  oth.ovl=ovl;
   const neu={n:rows.length,g:sum(rows,'gross_amount'),q:sum(rows,'qty')};
   const chk=suChecksum(rows,file);
   const {data:dup}=await sb.from('hs_settle_batch').select('id,loaded_at,loaded_by')
@@ -4252,9 +4287,24 @@ async function suPreflight(ch,ym,forms,rows,file,corp){
   const comCost=rows.filter(r=>r.deal_form==='위수탁'&&r.unit_cost);
   if(comCost.length)
     warns.push(`위수탁 ${comCost.length}행에 매입원가가 들어 있습니다. 직매입 자료가 섞이지 않았는지 확인해 주세요.`);
+  /* 2026-11-17 — 2026-03 에 「아이비알」 6행이 기존 1,000행(2.2억)을 지웠다.
+     대조 창은 «표로» 1,000→6 을 보여주고 있었다. 숫자는 맞았는데 아무도 안 멈췄다.
+     표는 읽히지 않는다. 멈춰야 할 때는 멈추라고 «말»해야 한다.
+     한 달치 정산서가 기존의 절반도 안 되는 행수로 들어오는 일은 거의 없다 —
+     보통은 일부만 뽑은 파일(과면세 확인용·브랜드 한 건)을 전체인 줄 알고 올린 것이다. */
+  if(oth.n && ovl>=Math.max(3,Math.ceil(rows.length*0.3)))
+    warns.push(`<b style="color:#B91C1C">이 파일의 ${won(ovl)}행이 그 달 다른 정산서(${esc(oth.files.join(' · '))})와 같은 거래입니다.</b>`
+      +` 홈사가 파일 이름만 바꿔 <b>수정본</b>을 다시 보낸 것이라면, 이대로 저장하면 <b>두 번 계상</b>됩니다 —`
+      +` 그 경우 <b>「그 달 전체 교체」를 켜고</b> 저장하세요. 정말 별도 정산서라면 그대로 진행하시면 됩니다.`);
+  if(cur.n>=20 && neu.n < cur.n*0.5)
+    warns.push(`<b style="color:#B91C1C">기존 ${won(cur.n)}행이 ${won(neu.n)}행으로 줄어듭니다 (${Math.round((1-neu.n/cur.n)*100)}% 감소).</b>`
+      +` 금액도 ${won(cur.g)}원 → ${won(neu.g)}원입니다.`
+      +` 이 파일이 <b>그 달 전체</b>가 맞는지 확인해 주세요 — 브랜드 한 건이나 과면세 확인용으로 «일부만» 뽑은 파일이면`
+      +` 나머지가 지워집니다. ${cur.all?'<b>「그 달 전체 교체」를 끄면</b> 같은 파일 이름의 행만 바뀝니다.':'일부만 더하려면 위의 <b>「같은 파일 기존 데이터 교체」 체크를 끄고</b> 저장하세요.'}`
+      +` <span class="muted">2026-03 에 6행 파일이 1,000행(2.2억)을 지운 적이 있습니다.</span>`);
   if(cur.n&&Math.abs(cur.q-neu.q)<1 && Math.abs(cur.g-neu.g)>Math.max(cur.g,neu.g)*0.05)
     warns.push(`수량은 같은데 <b>금액만 다릅니다</b> (${won(cur.g)} → ${won(neu.g)}). 같은 거래를 <b>다른 금액 기준</b>으로 읽고 있을 수 있습니다 — 정산금액인지 소비자판매가인지 확인해 주세요.`);
-  return {cur,neu,warns,chk};
+  return {cur,neu,oth,warns,chk};
 }
 function suConfirmDialog(info,chName,ym){
   return new Promise(res=>{
@@ -4274,7 +4324,8 @@ function suConfirmDialog(info,chName,ym){
           <tr style="border-top:1px solid var(--line1)"><td class="l">차이</td><td>${won(info.neu.n-info.cur.n)}</td><td>${won(info.neu.q-info.cur.q)}</td>
             <td style="font-weight:700;color:${d<0?'var(--blocked)':'var(--brand-ink)'}">${d>0?'+':''}${won(d)}</td></tr>
         </tbody></table>
-      ${info.cur.files.length?`<div class="muted" style="font-size:11.5px;margin-bottom:8px">기존 파일: ${esc(info.cur.files.join(' · '))}</div>`:''}
+      <div class="muted" style="font-size:11.5px;margin-bottom:8px">교체 범위: <b>${info.cur.all?'그 달 전체':'같은 파일 이름'}</b>${info.cur.files.length?` · 지워질 파일: ${esc(info.cur.files.join(' · '))}`:''}</div>
+      ${info.oth&&info.oth.n?`<div class="muted" style="font-size:11.5px;margin-bottom:8px">그대로 두는 다른 정산서: ${esc(info.oth.files.join(' · '))} — ${won(info.oth.n)}행 · ${won(info.oth.g)}원</div>`:''}
       ${info.warns.map(w=>`<div style="background:#FDF1DE;border:1px solid #F5D98B;border-radius:9px;padding:10px 12px;font-size:12px;color:#7A4A06;margin-bottom:8px;line-height:1.55">${w}</div>`).join('')}
       ${info.cur.n?`<p class="hint" style="margin:0 0 12px">「진행」을 누르면 기존 <b>${won(info.cur.n)}행</b>을 지우고 새로 넣습니다. 지운 내용은 복구할 수 있게 보관됩니다.</p>`:''}
       <div style="display:flex;gap:8px"><button class="btn primary" id="suPreGo">진행</button><button class="btn" id="suPreNo">취소</button></div>`;
@@ -4289,28 +4340,32 @@ $('suSave')&&($('suSave').onclick=async()=>{
   const btn=$('suSave');btn.disabled=true;btn.textContent='대조 중…';
   const forms=[...new Set(SU.rows.map(r=>r.deal_form).filter(Boolean))];
   let pre;
-  try{pre=await suPreflight(ch,ym,forms,SU.rows,SU.file,corp);}
+  const all=!!($('suReplaceAll')&&$('suReplaceAll').checked);
+  if(!all&&!SU.file){btn.disabled=false;btn.textContent='정산 원장에 저장';$('suMsg').innerHTML='<span style="color:var(--blocked)">파일 이름을 알 수 없어 «같은 파일» 교체를 할 수 없습니다 — 파일을 다시 선택해 주세요.</span>';return;}
+  try{pre=await suPreflight(ch,ym,forms,SU.rows,SU.file,corp,all);}
   catch(e){btn.disabled=false;btn.textContent='정산 원장에 저장';$('suMsg').innerHTML='<span style="color:var(--blocked)">대조 실패 — '+esc(dbMsg(e))+'</span>';return;}
   const go=await suConfirmDialog(pre,(suCorpName()?suCorpName()+' · ':'')+(BCH[ch]||''),ym);
   if(!go){btn.disabled=false;btn.textContent='정산 원장에 저장';$('suMsg').textContent='취소했습니다.';return;}
   btn.textContent='저장 중…';
   try{
-    if($('suReplace').checked){
+    if(all||$('suReplace').checked){
       // 지우기 전에 보관 — 잘못 덮었을 때 되돌릴 수 있게
       try{await sb.rpc('hs_settle_backup_before_replace',
         {p_channel:ch,p_ym:ym,p_form:forms.length===1?forms[0]:null,p_corp:corp,
-         p_reason:`업로드 교체: ${suCorpName()} ${SU.file} (${(ME&&ME.name)||''})`});}catch(_){}
+         p_reason:`업로드 교체(${all?'그 달 전체':'같은 파일'}): ${suCorpName()} ${SU.file} (${(ME&&ME.name)||''})`});}catch(_){}
       let q=sb.from('hs_settle_raw').delete().eq('channel_id',ch).eq('settle_month',ym).eq('tenant_id',corp);
       if(forms.length===1)q=q.eq('deal_form',forms[0]);       // 직매입 파일이 위수탁분을 지우지 않도록
+      if(!all)q=q.eq('source_file',SU.file);                   // 같은 달 다른 정산서는 건드리지 않는다 (2026-11-18)
       const {error:de}=await q;
       if(de)throw de;
     }
     const who=(ME&&ME.name)||$('who').textContent;
     /* 정산서에 적혀 있던 법인 표기를 그대로 남긴다.
        「아이비알」은 아이비알커머스로 합치기로 했지만(대표 확정 2026-08-14),
-       나중에 따로 뽑아야 할 일이 생기면 이 표식으로 갈라낸다. */
-    const note=(f=>{const s=String(f||'');
-      return /누아픽/.test(s)?'누아픽':/아이비알커머스/.test(s)?'아이비알커머스':/아이비알/.test(s)?'아이비알':null;})(SU.file);
+       나중에 따로 뽑아야 할 일이 생기면 이 표식으로 갈라낸다.
+       2026-11-17 — 파일 이름 정규식으로 뽑던 것을 «사람이 고른 값»으로 바꿨다.
+       오타 두 건에 무너진 자리다 (아이비알머커스 419행 · 아아비알 1,530행). */
+    const note=($('suCorpNote')&&$('suCorpNote').value)||null;
     const payload=SU.rows.map((r,i)=>({...r,channel_id:ch,settle_month:ym,settle_type:st,tenant_id:corp,
       corp_note:note,
       channel_name:BCH[ch]||null,source_file:SU.file,seq_no:i+1,updated_by:who,updated_at:new Date().toISOString()}));
@@ -4318,13 +4373,15 @@ $('suSave')&&($('suSave').onclick=async()=>{
       const {error}=await sb.from('hs_settle_raw').insert(payload.slice(i,i+200));
       if(error)throw error;
     }
-    try{await sb.from('hs_settle_batch').update({status:'superseded'}).eq('channel_id',ch).eq('settle_month',ym).eq('tenant_id',corp).eq('status','active');
+    try{let bq=sb.from('hs_settle_batch').update({status:'superseded'}).eq('channel_id',ch).eq('settle_month',ym).eq('tenant_id',corp).eq('status','active');
+        if(!all)bq=bq.eq('source_file',SU.file);
+        await bq;
         await sb.from('hs_settle_batch').insert({tenant_id:corp,channel_id:ch,settle_month:ym,
           deal_form:forms.length===1?forms[0]:null,source_file:SU.file,checksum:pre.chk,
           row_count:payload.length,gross_sum:pre.neu.g,replaced_rows:pre.cur.n,replaced_gross:pre.cur.g,
           loaded_by:(ME&&ME.name)||$('who').textContent});}catch(_){}
     act('write','upload','hs_settle_raw',{ch:BCH[ch]||null,ym,rows:payload.length,file:SU.file,
-      replaced:pre.cur.n,delta:pre.neu.g-pre.cur.g},'lead');
+      replaced:pre.cur.n,delta:pre.neu.g-pre.cur.g,scope:all?'month':'file',kept:pre.oth.n,overlap:pre.oth.ovl},'lead');
     toast(`${ym} ${BCH[ch]||''} 정산 ${payload.length}행 저장`,'ok');
     $('suMsg').innerHTML='<span style="color:#0f9d58">저장 완료 — 결산·검수에 반영됐습니다</span>';
     $('suPrev').innerHTML='';$('suFile').value='';$('suSetup').classList.add('hidden');SU.rows=[];
@@ -8179,6 +8236,7 @@ async function mtNew(pre){
   pre=pre||{};
   await mtBrands();
   MT.cur=null;MT.links=[];MT.acts=[];mtRecReset();
+  mtRecBlockClear();              // 지난번 마이크 안내가 새 회의록에 남아 있지 않게
   $('mtHead').textContent='회의록';$('mtDel').style.display='none';
   $('mt_title').value=pre.title||'';$('mt_at').value=mtLocal(new Date());
   $('mt_att').value='';$('mt_place').value='';$('mt_body').value='';$('mt_sum').value='';
@@ -8475,6 +8533,9 @@ async function mtRecStop(silent){
         +(MT.segFail?`업로드가 ${MT.segFail}번 실패했습니다 — 인터넷을 확인하고 다시 녹음해 주세요.`
                     :'마이크에 소리가 안 잡혔을 수 있습니다. 마이크 권한과 입력 장치를 확인해 주세요.')
         +' <span class="muted">회의록 본문은 직접 적고 「✦ 정리하기」를 눌러도 됩니다.</span>';
+      // 2026-11-17 — 녹음은 돌았는데 한 조각도 못 올린 경우. 가장 억울한 자리라 반드시 남긴다.
+      act('meeting','rec_empty',MT.recId,{fail:MT.segFail||0,tiny:MT.segTiny||0,
+        sec:Math.round((Date.now()-MT.recT0)/1000)},'self');
       toast('녹음 구간이 없어 전사를 건너뜁니다','bad');
       return;
     }
@@ -8503,6 +8564,9 @@ async function mtPutSeg(blob,mime){
                  await new Promise(r=>setTimeout(r,1200*try_));}
       else{MT.segFail=(MT.segFail||0)+1;
            $('mtRecUp').textContent='업로드 실패 — '+error.message;
+           // 2026-11-17 — 화면에만 뜨고 사라지던 실패를 기록에 남긴다
+           act('meeting','seg_fail',MT.recId,{seq,bytes:blob.size,
+             msg:String(error.message||'').slice(0,160)},'self');
            toast('녹음 조각 업로드 실패 (3회 시도)','bad');}
     }
   })();
@@ -8514,16 +8578,54 @@ function mtCycle(){
   if(!MT.recOn||!MT.rec)return;
   try{ MT.rec.stop(); }catch(_){}
 }
+/* 2026-11-17 — 「회의록 녹음이 안 된다」는 신고가 왔는데 «무엇이» 안 되는지 알 길이 없었다.
+   act('meeting','record') 가 마이크가 열린 «뒤»에만 찍혀서, 막힌 경우는 기록이 통째로 없다.
+   실측: 10-15 이후 record 로그 2건뿐이고 그 둘이 정확히 성공한 사람들이었다.
+   나머지는 「눌렀는데 막혔다」인지 「안 눌렀다」인지 구분이 안 됐다.
+   → 막히는 길목마다 사유를 남긴다.
+
+   2026-11-17 두 번째 — 11-17 김윤희 님이 「K쇼핑 당큐락 미팅」을 09:04:54 에 열고
+   09:05:43 에 본문 201자를 «손으로 적어» 저장했다. 그 사이 record 로그가 없다.
+   라이브 코드(md5 2f2b8b4e…)는 막힐 때 toast «만» 띄웠다 — 2.5초 뒤 사라진다.
+   사람은 안내를 못 보고 「녹음이 안 된다」로만 기억한다. 그래서 들은 말도 그것뿐이었다.
+   → 사라지지 않는 안내를 모달 안(#mtStuck)에 남긴다. 무엇을 해야 하는지까지 적는다. */
+function mtRecBlock(html){
+  const b=$('mtStuck');if(!b)return;
+  b.innerHTML=html;b.style.display='';
+}
+function mtRecBlockClear(){ const b=$('mtStuck');if(b){b.style.display='none';b.innerHTML='';} }
 async function mtRecToggle(){
   if(MT.recOn){await mtRecStop();return;}
+  const ua=navigator.userAgent||'';
+  const 브라우저=/Edg\//.test(ua)?'Edge':/Whale/.test(ua)?'웨일':/Chrome\//.test(ua)?'크롬':/Safari\//.test(ua)?'사파리':'브라우저';
   if(!navigator.mediaDevices||!window.MediaRecorder){
+    act('meeting','record_blocked',null,{why:'unsupported',
+      hasMD:!!navigator.mediaDevices,hasMR:!!window.MediaRecorder,
+      secure:window.isSecureContext,ua:ua.slice(0,120)},'self');
+    mtRecBlock('<b>이 브라우저에서는 녹음이 안 됩니다.</b> 크롬이나 Edge 로 다시 열어 주세요.'
+      +' <span class="muted">본문은 직접 적고 「✦ 정리하기」를 눌러도 됩니다.</span>');
     toast('이 브라우저는 녹음을 지원하지 않습니다','bad');return;}
   const mime=mtMime();
-  if(!mime){toast('이 브라우저에서 쓸 수 있는 녹음 형식이 없습니다','bad');return;}
+  if(!mime){
+    act('meeting','record_blocked',null,{why:'no_mime',ua:ua.slice(0,120)},'self');
+    mtRecBlock('<b>이 브라우저에 쓸 수 있는 녹음 형식이 없습니다.</b> 크롬이나 Edge 로 다시 열어 주세요.');
+    toast('이 브라우저에서 쓸 수 있는 녹음 형식이 없습니다','bad');return;}
 
   let stream;
   try{ stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); }
-  catch(e){ toast(e.name==='NotAllowedError'?'마이크 권한을 허용해 주세요':'마이크를 열지 못했습니다','bad');return; }
+  catch(e){
+    const nm=e&&e.name;
+    act('meeting','record_blocked',null,{why:'getUserMedia',name:nm,
+      msg:String(e&&e.message||'').slice(0,120),secure:window.isSecureContext,
+      ua:ua.slice(0,120)},'self');
+    mtRecBlock(nm==='NotAllowedError'
+      ? '<b>마이크 권한이 막혀 있습니다.</b> 주소창 왼쪽 자물쇠(또는 🎙) 를 누르고 «마이크 → 허용» 으로 바꾼 뒤'
+        +' 이 창을 닫고 다시 「🎙 녹음」을 눌러 주세요. <span class="muted">'+브라우저+' 설정에 한 번만 해두면 됩니다.</span>'
+      : nm==='NotFoundError'
+      ? '<b>마이크를 찾지 못했습니다.</b> 헤드셋·마이크가 꽂혀 있는지, 윈도우 소리 설정에서 입력 장치가 잡히는지 확인해 주세요.'
+      : '<b>마이크를 열지 못했습니다'+(nm?' ('+esc(nm)+')':'')+'.</b> 다른 프로그램(줌·팀즈 등)이 마이크를 쓰고 있으면 끄고 다시 눌러 주세요.');
+    toast(nm==='NotAllowedError'?'마이크 권한을 허용해 주세요':'마이크를 열지 못했습니다','bad');return; }
+  mtRecBlockClear();
 
   // 회의록이 아직 없으면 지금 만든다 — 오디오는 이 id 폴더로 들어간다
   if(!MT.cur){
